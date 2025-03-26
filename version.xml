@@ -1,0 +1,9 @@
+<package name="rc" version="0.0.1">
+    <depends on='BEAST.base' atleast='2.7.7'/>
+    <depends on='BEAST.app' atleast='2.7.7'/>
+    <depends on='BEASTLabs' atleast='2.0.2'/>
+
+    <service type="beast.base.core.BEASTInterface">
+        <provider classname="rc.beast.evolution.substitutionmodel.F84"/>
+    </service>
+</package>

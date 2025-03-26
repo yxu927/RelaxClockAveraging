@@ -1,0 +1,23 @@
+# artifacts
+*.DS_Store
+**/*.iws
+**/*.ipr
+**/*.iml
+out/
+
+# build directory
+build
+tmp/
+**/target/**
+*.class
+
+# idea directory
+/.idea/
+
+# gradle directory
+.gradle
+
+# output files
+*.log
+*.trees
+*.state

@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="DensiTree">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/release/common/tools/DensiTree.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>
