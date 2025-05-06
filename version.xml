@@ -3,7 +3,30 @@
     <depends on='BEAST.app' atleast='2.7.7'/>
     <depends on='BEASTLabs' atleast='2.0.2'/>
 
+
+    <service type="beast.base.evolution.datatype.DataType">
+        <provider classname="beast.base.evolution.datatype.Aminoacid"/>
+        <provider classname="beast.base.evolution.datatype.Nucleotide"/>
+        <provider classname="beast.base.evolution.datatype.TwoStateCovarion"/>
+        <provider classname="beast.base.evolution.datatype.Binary"/>
+        <provider classname="beast.base.evolution.datatype.IntegerData"/>
+        <provider classname="beast.base.evolution.datatype.StandardData"/>
+        <provider classname="beast.base.evolution.datatype.UserDataType"/>
+    </service>
+
+    <service type="beast.base.inference.ModelLogger">
+        <provider classname="beast.base.inference.ModelLogger"/>
+        <provider classname="beast.base.parser.XMLModelLogger"/>
+    </service>
+
     <service type="beast.base.core.BEASTInterface">
         <provider classname="rc.beast.evolution.substitutionmodel.F84"/>
+        <provider classname="beast.base.evolution.branchratemodel.RandomLocalClockModel"/>
+        <provider classname="beast.base.evolution.branchratemodel.StrictClockModel"/>
+        <provider classname="beast.base.evolution.branchratemodel.UCRelaxedClockModel"/>
+        <provider classname="rc.beast.evolution.clockmodel.AutoCorrelatedClockModel"/>
+        <provider classname="rc.beast.evolution.clockmodel.AutoCorrelatedPrior"/>
+        <provider classname="rc.beast.evolution.clockmodel.MeanZCalculator"/>
+
     </service>
 </package>
