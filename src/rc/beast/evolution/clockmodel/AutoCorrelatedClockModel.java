@@ -6,13 +6,14 @@ import beast.base.core.Log;
 import beast.base.evolution.branchratemodel.BranchRateModel;
 import beast.base.evolution.tree.Node;
 import beast.base.evolution.tree.Tree;
+import beast.base.inference.operator.UpDownOperator;
 import beast.base.inference.parameter.RealParameter;
 
 import java.util.Arrays;
 
 
 @Description("AutoCorrelatedClockModel using bridging from parent->child log-rates and optional normalization.")
-public class AutoCorrelatedClockModel extends BranchRateModel.Base {
+public class AutoCorrelatedClockModel extends BranchRateModel.Base implements UpDownOp {
 
     // Inputs
     public final Input<Tree> treeInput = new Input<>(
@@ -234,4 +235,39 @@ public class AutoCorrelatedClockModel extends BranchRateModel.Base {
         renormalize = false;
         super.restore();
     }
+
+    @Override
+    public UpDownOperator getUpDownOperator1(Tree tree) {
+
+        UpDownOperator upDownOperator = new UpDownOperator();
+        String idStr = getID() + "Up" + tree.getID() + "DownOperator1";
+        upDownOperator.setID(idStr);
+
+        upDownOperator.setInputValue("scaleFactor", 0.75);
+        upDownOperator.setInputValue("weight", 3.0);
+
+        upDownOperator.setInputValue("down", sigma2Input.get());
+        upDownOperator.setInputValue("up", tree);
+
+        upDownOperator.initAndValidate();
+        return upDownOperator;
+    }
+
+    @Override
+    public UpDownOperator getUpDownOperator2(Tree tree) {
+        UpDownOperator upDownOperator = new UpDownOperator();
+        String idStr = getID() + "Up" + tree.getID() + "DownOperator2";
+        upDownOperator.setID(idStr);
+
+        upDownOperator.setInputValue("scaleFactor", 0.75);
+        upDownOperator.setInputValue("weight", 3.0);
+
+        upDownOperator.setInputValue("up", rootLogRateInput.get());
+        upDownOperator.setInputValue("down", tree);
+
+        upDownOperator.initAndValidate();
+        return upDownOperator;
+    }
+
+
 }

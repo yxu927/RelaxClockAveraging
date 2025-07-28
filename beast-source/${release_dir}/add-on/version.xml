@@ -181,8 +181,5 @@
                 <provider classname="beast.base.inference.parameter.RealParameterList"/>
                 <provider classname="beast.base.inference.util.ESS"/>
                 <provider classname="beast.base.inference.util.RPNcalculator"/>
-                <provider classname="rc.beast.evolution.clockmodel.AutoCorrelatedClockModel"/>
-                <provider classname="rc.beast.evolution.clockmodel.AutoCorrelatedPrior"/>
-                <provider classname="rc.beast.evolution.clockmodel.MeanZCalculator"/>
             </service>
 </package>
