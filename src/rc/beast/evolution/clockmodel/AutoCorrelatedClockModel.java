@@ -27,6 +27,8 @@ public class AutoCorrelatedClockModel extends BranchRateModel.Base {
             Input.Validate.REQUIRED
     );
 
+
+
     public final Input<RealParameter> rootLogRateInput = new Input<>(
             "rootLogRate",
             "the log(rate) for the root node (dimension=1)",
