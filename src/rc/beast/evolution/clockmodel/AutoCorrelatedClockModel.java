@@ -6,219 +6,263 @@ import beast.base.core.Log;
 import beast.base.evolution.branchratemodel.BranchRateModel;
 import beast.base.evolution.tree.Node;
 import beast.base.evolution.tree.Tree;
+import beast.base.inference.StateNode;
 import beast.base.inference.operator.UpDownOperator;
 import beast.base.inference.parameter.RealParameter;
 
 import java.util.Arrays;
 
+@Description("Auto-correlated clock: branch rate = E(Z) from bridged log-rates; "
+        + "optional normalization to time-weighted mean 1, plus optional global meanRate multiplier.")
+public class AutoCorrelatedClockModel extends BranchRateModel.Base {
 
-@Description("AutoCorrelatedClockModel using bridging from parent->child log-rates and optional normalization.")
-public class AutoCorrelatedClockModel extends BranchRateModel.Base implements UpDownOp {
-
-    // Inputs
     public final Input<Tree> treeInput = new Input<>(
             "tree",
-            "the tree used by this auto-correlated clock",
+            "tree used by this clock",
             Input.Validate.REQUIRED
     );
 
     public final Input<RealParameter> nodeLogRatesInput = new Input<>(
             "nodeRates",
-            "log(rate) for NON-root nodes, dimension=(tree.nodeCount - 1)",
+            "log(rate) for NON-root nodes, dimension = (tree.nodeCount - 1)",
             Input.Validate.REQUIRED
     );
 
-
-
     public final Input<RealParameter> rootLogRateInput = new Input<>(
             "rootLogRate",
-            "the log(rate) for the root node (dimension=1)",
+            "root log(rate), dimension=1. If normalize=true, this must be fixed at 0.",
             Input.Validate.REQUIRED
     );
 
     public final Input<RealParameter> sigma2Input = new Input<>(
             "sigma2",
-            "the Brownian variance parameter (sigma^2)",
+            "Brownian variance parameter (sigma^2)",
             Input.Validate.REQUIRED
     );
 
     public final Input<Integer> taylorOrderInput = new Input<>(
             "taylorOrder",
-            "Taylor expansion order for bridging integral (default=10)",
+            "Taylor expansion order for E(Z) approximation (default=10)",
             10
     );
 
     public final Input<Boolean> normalizeInput = new Input<>(
             "normalize",
-            "whether to scale the average rate to 1.0 across the tree (default false)",
+            "if true: rescale time-weighted mean rate across tree to 1",
             false
     );
 
-    // Optional global multiplier for all branch rates
     public final Input<RealParameter> meanRateInput = new Input<>(
-            "myMeanRate",  // <-- renamed!
-            "global rate multiplier (default=1.0)"
+            "meanRate",
+            "overall rate multiplier (default=1.0). In normalize=true this is the absolute scale."
     );
 
-    // Class fields
     protected Tree tree;
     protected RealParameter nodeLogRates;
     protected RealParameter rootLogRate;
     protected RealParameter sigma2;
     protected RealParameter meanRate;
+
     protected int taylorOrder;
     protected boolean doNormalize;
-
     protected double[] branchRates;
     protected double[] storedBranchRates;
-
     protected double scaleFactor = 1.0;
     protected double storedScaleFactor = 1.0;
-
-    protected boolean recompute = true;
-    protected boolean renormalize = true;
-
     protected int nNodes;
     protected int rootNr;
-
-    // nodeIndexMapping[i] = index in nodeLogRates for node i, or -1 if root
     protected int[] nodeIndexMapping;
 
     @Override
     public void initAndValidate() {
-        // Retrieve inputs
         tree = treeInput.get();
         nodeLogRates = nodeLogRatesInput.get();
         rootLogRate = rootLogRateInput.get();
         sigma2 = sigma2Input.get();
+
         taylorOrder = taylorOrderInput.get();
         doNormalize = normalizeInput.get();
 
-        // Handle optional meanRate
         meanRate = meanRateInput.get();
         if (meanRate == null) {
             meanRate = new RealParameter("1.0");
         }
 
+        if (rootLogRate.getDimension() != 1) {
+            throw new IllegalArgumentException("rootLogRate must have dimension=1.");
+        }
+        if (meanRate.getDimension() != 1) {
+            throw new IllegalArgumentException("meanRate must have dimension=1.");
+        }
 
         nNodes = tree.getNodeCount();
-        Node root = tree.getRoot();
-        rootNr = root.getNr();
+        rootNr = tree.getRoot().getNr();
 
-        if (rootLogRate.getDimension() != 1) {
-            throw new IllegalArgumentException("rootLogRate must have dimension=1");
-        }
         if (nodeLogRates.getDimension() != nNodes - 1) {
-            throw new IllegalArgumentException(
-                    "nodeRates dimension must be (tree.nodeCount - 1). Found: " +
-                            nodeLogRates.getDimension() + " vs " + (nNodes - 1)
-            );
+            throw new IllegalArgumentException("nodeRates must have dimension (nodeCount - 1). Found "
+                    + nodeLogRates.getDimension() + " vs " + (nNodes - 1));
+        }
+
+        // normalize=true: enforce rootLogRate fixed at 0 (log-rate=0 => rate=1)
+        if (doNormalize) {
+            double v = rootLogRate.getValue();
+            if (Math.abs(v) > 1e-12) {
+                throw new IllegalArgumentException("normalize=true requires rootLogRate fixed to 0.0. Found: " + v);
+            }
         }
 
         branchRates = new double[nNodes];
         storedBranchRates = new double[nNodes];
 
+        // Build mapping by node number (nr)
         nodeIndexMapping = new int[nNodes];
+        Arrays.fill(nodeIndexMapping, -2);
+
         int idx = 0;
         for (int i = 0; i < nNodes; i++) {
-            if (i == rootNr) {
-                nodeIndexMapping[i] = -1; // root
+            Node node = tree.getNode(i);
+            int nr = node.getNr();
+            if (nr < 0 || nr >= nNodes) {
+                throw new IllegalArgumentException("Node nr out of range: " + nr + " (nNodes=" + nNodes + ")");
+            }
+            if (nr == rootNr) {
+                nodeIndexMapping[nr] = -1;
             } else {
-                nodeIndexMapping[i] = idx;
-                idx++;
+                nodeIndexMapping[nr] = idx++;
             }
         }
 
-        Log.info.println("AutoCorrelatedClockModel init: nNodes=" + nNodes +
-                ", doNormalize=" + doNormalize + ", taylorOrder=" + taylorOrder);
+        recalcAllBranchRates();
+        if (doNormalize) {
+            computeScaleFactor();
+        } else {
+            scaleFactor = 1.0;
+        }
+
+        Log.info.println("AutoCorrelatedClockModel init: nNodes=" + nNodes
+                + ", normalize=" + doNormalize
+                + ", taylorOrder=" + taylorOrder);
     }
 
     @Override
     public double getRateForBranch(Node node) {
         if (node.isRoot()) {
-            // root has no parent => no branch
             return 1.0;
         }
-        synchronized (this) {
-            if (recompute) {
-                recalcAllBranchRates();
-                recompute = false;
-                renormalize = true;
-            }
-            if (renormalize && doNormalize) {
-                computeScaleFactor();
-                renormalize = false;
-            }
+
+        double mr = meanRate.getValue();
+        if (mr <= 0.0) {
+            return 0.0;
         }
 
-        return branchRates[node.getNr()] * scaleFactor;
+        return branchRates[node.getNr()] * scaleFactor * mr;
     }
 
     private void recalcAllBranchRates() {
         Arrays.fill(branchRates, 1.0);
 
-        double phi = sigma2.getValue();
-        double globalRateVal = meanRate.getValue();
+        final double phi = sigma2.getValue();
+        if (phi <= 0.0) {
+
+            throw new IllegalArgumentException("sigma2 must be > 0. Found: " + phi);
+        }
 
         for (int i = 0; i < nNodes; i++) {
             Node node = tree.getNode(i);
-            if (!node.isRoot()) {
-                Node parent = node.getParent();
-                int parentNr = parent.getNr();
+            if (node.isRoot()) continue;
 
-                double vPar = (parent.isRoot())
-                        ? rootLogRate.getValue()
-                        : nodeLogRates.getValue(nodeIndexMapping[parentNr]);
+            final int nr = node.getNr();
+            final Node parent = node.getParent();
+            final int parentNr = parent.getNr();
 
-                double vChi = nodeLogRates.getValue(nodeIndexMapping[i]);
+            final double vPar = parent.isRoot()
+                    ? rootLogRate.getValue()
+                    : nodeLogRates.getValue(nodeIndexMapping[parentNr]);
 
-                double rp = Math.exp(vPar);
-                double rc = Math.exp(vChi);
+            final double vChi = nodeLogRates.getValue(nodeIndexMapping[nr]);
 
-                double dt = parent.getHeight() - node.getHeight();
-                if (dt < 0.0) {
-                    dt = 0.0;
-                }
-                // eZ = mean rate along branch from bridging
-                double eZ = MeanZCalculator.computeMeanZ(rp, rc, dt, phi, taylorOrder);
+            final double rp = Math.exp(vPar);
+            final double rc = Math.exp(vChi);
 
-                branchRates[i] = eZ * globalRateVal;
+            double dt = parent.getHeight() - node.getHeight();
+            if (dt <= 0.0) {
+
+                branchRates[nr] = rp;
+                continue;
             }
+
+            branchRates[nr] = MeanZCalculator.computeMeanZ(rp, rc, dt, phi, taylorOrder);
         }
     }
 
-    /**
-     * If doNormalize = true, we scale so that the average rate across the tree = 1.0
-     */
     private void computeScaleFactor() {
-        double sumRate = 0.0;
+
+        double sumRateTime = 0.0;
         double sumTime = 0.0;
+
         for (int i = 0; i < nNodes; i++) {
             Node node = tree.getNode(i);
-            if (!node.isRoot()) {
-                double dt = node.getParent().getHeight() - node.getHeight();
-                if (dt < 0) dt = 0;
-                sumRate += branchRates[i] * dt;
-                sumTime += dt;
-            }
+            if (node.isRoot()) continue;
+
+            final int nr = node.getNr();
+            double dt = node.getParent().getHeight() - node.getHeight();
+            if (dt <= 0.0) continue;
+
+            sumRateTime += branchRates[nr] * dt;
+            sumTime += dt;
         }
-        if (sumRate <= 0.0) {
+
+        if (sumRateTime <= 0.0) {
             scaleFactor = 1.0;
         } else {
-            scaleFactor = sumTime / sumRate;
+            scaleFactor = sumTime / sumRateTime;
         }
     }
 
     @Override
     protected boolean requiresRecalculation() {
+        boolean ratesDirty = false;
+        boolean anyDirty = false;
 
-        recompute = true;
-        return true;
+        if (tree != null && ((StateNode) tree).somethingIsDirty()) {
+            ratesDirty = true;
+            anyDirty = true;
+        }
+        if (nodeLogRates != null && nodeLogRates.somethingIsDirty()) {
+            ratesDirty = true;
+            anyDirty = true;
+        }
+        if (rootLogRate != null && rootLogRate.somethingIsDirty()) {
+            // normalize=true: rootLogRate must not be estimated/proposed
+            if (doNormalize) {
+                throw new IllegalStateException("normalize=true: rootLogRate must be fixed at 0 and must not be proposed.");
+            }
+            ratesDirty = true;
+            anyDirty = true;
+        }
+        if (sigma2 != null && sigma2.somethingIsDirty()) {
+            ratesDirty = true;
+            anyDirty = true;
+        }
+
+        if (meanRate != null && meanRate.somethingIsDirty()) {
+            anyDirty = true;
+        }
+
+        if (ratesDirty) {
+            recalcAllBranchRates();
+            if (doNormalize) {
+                computeScaleFactor();
+            } else {
+                scaleFactor = 1.0;
+            }
+        }
+
+        return anyDirty;
     }
 
     @Override
     public void store() {
-
         System.arraycopy(branchRates, 0, storedBranchRates, 0, nNodes);
         storedScaleFactor = scaleFactor;
         super.store();
@@ -226,47 +270,12 @@ public class AutoCorrelatedClockModel extends BranchRateModel.Base implements Up
 
     @Override
     public void restore() {
-        double[] temp = branchRates;
+        double[] tmp = branchRates;
         branchRates = storedBranchRates;
-        storedBranchRates = temp;
+        storedBranchRates = tmp;
+
         scaleFactor = storedScaleFactor;
-
-        recompute = false;
-        renormalize = false;
         super.restore();
-    }
-
-    @Override
-    public UpDownOperator getUpDownOperator1(Tree tree) {
-
-        UpDownOperator upDownOperator = new UpDownOperator();
-        String idStr = getID() + "Up" + tree.getID() + "DownOperator1";
-        upDownOperator.setID(idStr);
-
-        upDownOperator.setInputValue("scaleFactor", 0.75);
-        upDownOperator.setInputValue("weight", 3.0);
-
-        upDownOperator.setInputValue("down", sigma2Input.get());
-        upDownOperator.setInputValue("up", tree);
-
-        upDownOperator.initAndValidate();
-        return upDownOperator;
-    }
-
-    @Override
-    public UpDownOperator getUpDownOperator2(Tree tree) {
-        UpDownOperator upDownOperator = new UpDownOperator();
-        String idStr = getID() + "Up" + tree.getID() + "DownOperator2";
-        upDownOperator.setID(idStr);
-
-        upDownOperator.setInputValue("scaleFactor", 0.75);
-        upDownOperator.setInputValue("weight", 3.0);
-
-        upDownOperator.setInputValue("up", rootLogRateInput.get());
-        upDownOperator.setInputValue("down", tree);
-
-        upDownOperator.initAndValidate();
-        return upDownOperator;
     }
 
 
