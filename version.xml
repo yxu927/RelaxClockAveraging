@@ -28,5 +28,20 @@
         <provider classname="rc.beast.evolution.clockmodel.AutoCorrelatedPrior"/>
         <provider classname="rc.beast.evolution.clockmodel.MeanZCalculator"/>
 
+        <provider classname="rc.beast.evolution.clockmodel.MixtureTreeLikelihood"/>
+        <provider classname="rc.beast.evolution.clockmodel.IfElseRealParameter"/>
+
+        <provider classname="rc.beast.evolution.clockmodel.CategoricalDistribution"/>
+
+
+
+        <provider classname="rc.beast.evolution.clockmodel.MixtureLikelihoodLogger"/>
+        <provider classname="rc.beast.evolution.clockmodel.AlphaAnnealingOperator"/>
+
+        <provider classname="rc.beast.evolution.clockmodel.GlobalLogRateShiftOperator"/>
+        <provider classname="rc.beast.evolution.clockmodel.TreeLogRateScaleOperator"/>
+
+
+
     </service>
 </package>
