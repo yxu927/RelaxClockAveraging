@@ -1,62 +1,49 @@
 package rc.beast.evolution.clockmodel;
 
-/**
- * Demonstration: compute E[Z] by a purely analytic Taylor expansion,
- * without any "step" for numeric integration.
- *
- * E[Z] = (1/t)* ∫_{s=0..t} exp(v0 + x(s)) ds
- * where x(s) = ( (vt - v0)/t )*s + (sigma^2 / (2*t))* s*(t-s).
- *
- * We expand exp(v0 + x) ~ exp(v0)* ∑_{k=0..N-1} [ x^k / k! ],
- * then each (x(s))^k is integrated term-by-term as a polynomial in s.
- */
+
 public class MeanZCalculator {
 
-    /**
-     * Compute E(Z) by analytic expansion + polynomial integration.
-     * @param r0     branch start rate (>0)
-     * @param rt     branch end rate   (>0)
-     * @param t      branch length     (>0)
-     * @param phi    sigma^2 (Brownian variance scale, >=0)
-     * @param order  Taylor expansion order, e.g. 10
-     * @return approximate E(Z)
-     */
+    private static final double MAX_RATE_MULTIPLIER = 1.0e4;
+
+
     public static double computeMeanZ(double r0, double rt,
-                                               double t, double phi,
-                                               int order)
-    {
-        if (t <= 0.0 || order < 1) {
-            throw new IllegalArgumentException("Invalid t or order.");
+                                      double t, double phi,
+                                      int order) {
+
+        if (t <= 0.0) {
+            throw new IllegalArgumentException("MeanZCalculator.computeMeanZ: t must be > 0, got " + t);
+        }
+        if (order < 1) {
+            throw new IllegalArgumentException("MeanZCalculator.computeMeanZ: order must be >= 1, got " + order);
         }
         if (r0 <= 0.0 || rt <= 0.0) {
-            throw new IllegalArgumentException("Rates must be positive.");
+            throw new IllegalArgumentException("MeanZCalculator.computeMeanZ: rates must be positive. r0="
+                    + r0 + ", rt=" + rt);
         }
+
         // v0, vT
-        double v0 = Math.log(r0);
-        double vT = Math.log(rt);
+        final double v0 = Math.log(r0);
+        final double vT = Math.log(rt);
 
+        final double a = (vT - v0) / t;
+        final double b = phi / (2.0 * t);
 
-        double a = (vT - v0) / t;
-        double b = phi / (2.0 * t);
-
-        // Then x(s) = (a + b*t)* s  -  b * s^2
-        double A = a + b*t;
-        double B = b; // so x(s) = A*s - B*s^2
-
+        final double A = a + b * t;
+        final double B = b;
 
         double sumAll = 0.0;
 
         for (int k = 0; k < order; k++) {
-
             double term_k = 0.0;
+
             for (int m = 0; m <= k; m++) {
                 long c = binomial(k, m);
-                double sign = ((m % 2) == 0) ? 1.0 : -1.0;
-                // coefficient
+                double sign = ((m & 1) == 0) ? 1.0 : -1.0;
+
                 double cAB = c * sign * Math.pow(A, k - m) * Math.pow(B, m);
-                // power of s is k - m + 2*m = k + m
+
                 int p = k + m;
-                double factor = cAB * (1.0 / (p+1.0)) * Math.pow(t, p+1.0);
+                double factor = cAB * (1.0 / (p + 1.0)) * Math.pow(t, p + 1.0);
                 term_k += factor;
             }
 
@@ -65,12 +52,67 @@ public class MeanZCalculator {
         }
 
         double result = Math.exp(v0) * sumAll / t;
+
+
+        boolean bad = false;
+
+        if (!Double.isFinite(result) || result <= 0.0) {
+            bad = true;
+        } else {
+
+            double maxEndpoint = Math.max(r0, rt);
+            double maxReasonable = MAX_RATE_MULTIPLIER * maxEndpoint;
+            if (result > maxReasonable) {
+                bad = true;
+            }
+        }
+
+        if (bad) {
+
+            result = simpsonMeanZ(v0, vT, t, phi, 256);
+        }
+
+        if (!Double.isFinite(result) || result <= 0.0) {
+            result = Math.sqrt(r0 * rt);
+        }
+
         return result;
     }
 
-    /** A simple factorial function for small k (<= 20 or so). */
-    private static double factorial(int n) {
 
+
+    private static double simpsonMeanZ(double v0, double vT,
+                                       double t, double phi,
+                                       int steps) {
+
+        if (steps <= 0) {
+            throw new IllegalArgumentException("Simpson steps must be positive, got " + steps);
+        }
+
+        final double h = t / steps;
+
+        double sum = integrand(v0, vT, 0.0, t, phi)
+                + integrand(v0, vT, t,   t, phi);
+
+        for (int i = 1; i < steps; i++) {
+            double s = i * h;
+            double val = integrand(v0, vT, s, t, phi);
+            sum += ((i & 1) == 1) ? 4.0 * val : 2.0 * val;
+        }
+
+        double integral = sum * (h / 3.0);
+        return integral / t;
+    }
+
+
+    private static double integrand(double v0, double vT,
+                                    double s, double t, double phi) {
+        double meanVs = v0 + (vT - v0) * (s / t);
+        double varVs  = phi * (s * (t - s) / t);
+        return Math.exp(meanVs + 0.5 * varVs);
+    }
+
+    private static double factorial(int n) {
         double f = 1.0;
         for (int i = 1; i <= n; i++) {
             f *= i;
@@ -78,9 +120,7 @@ public class MeanZCalculator {
         return f;
     }
 
-    /** Compute binomial coefficient "n choose k" in a basic integer manner. */
     private static long binomial(int n, int k) {
-
         if (k < 0 || k > n) return 0;
         long c = 1;
         for (int i = 0; i < k; i++) {
@@ -89,45 +129,20 @@ public class MeanZCalculator {
         return c;
     }
 
-    // ------------------------------------------------------------------
-
     public static void main(String[] args) {
-        // Example usage:
-        double r0   = 2.0;   // start rate
-        double rt   = 3.5;   // end rate
-        double tLen = 1.0;   // length
-        double phi  = 0.2;   // sigma^2
-        int order   = 16;    // Taylor expansion order
+        double r0   = 1.0;
+        double rt   = 1.0;
+        double tLen = 10;
+        double phi  = 0;
+        int order   = 16;
 
-        double val = computeMeanZ(r0, rt, tLen, phi, order);
-        System.out.println("E[Z] approx by analytic Taylor, order="+order+": " + val);
+        double valSeries = computeMeanZ(r0, rt, tLen, phi, order);
+        System.out.println("E[Z] (safe series+Simpson) = " + valSeries);
 
-        // Compare to Simpson approach, for instance:
-        double valSimpson = compareSimpson(r0, rt, tLen, phi, 200000);
-        System.out.println("Simpson(200 steps) = " + valSimpson);
-        System.out.println("difference = " + Math.abs(val - valSimpson));
-    }
-
-    // A quick Simpson method to compare, if you want:
-    private static double compareSimpson(double r0, double rt, double t, double phi, int steps) {
         double v0 = Math.log(r0);
         double vT = Math.log(rt);
-        double h = t / steps;
-        double f0 = integrand(v0, vT, 0.0, t, phi);
-        double fN = integrand(v0, vT, t, t, phi);
-        double sum = f0 + fN;
-        for (int i = 1; i < steps; i++) {
-            double s = i*h;
-            double val = integrand(v0, vT, s, t, phi);
-            if ((i % 2) == 1) sum += 4*val; else sum += 2*val;
-        }
-        double integral = sum*(h/3.0);
-        return integral/t;
-    }
-    // same integrand as before
-    private static double integrand(double v0, double vT, double s, double t, double phi) {
-        double meanVs = v0 + (vT - v0)*(s/t);
-        double varVs  = phi*(s*(t-s)/t);
-        return Math.exp(meanVs + 0.5*varVs);
+        double valSimpson = simpsonMeanZ(v0, vT, tLen, phi, 200000);
+        System.out.println("Pure Simpson(200000 steps) = " + valSimpson);
+        System.out.println("difference = " + Math.abs(valSeries - valSimpson));
     }
 }
