@@ -1,0 +1,42 @@
+<package name="mixture" version="0.0.1">
+    <depends on='BEAST.base' atleast='2.7.7'/>
+    <depends on='BEAST.app' atleast='2.7.7'/>
+    <depends on='BEASTLabs' atleast='2.0.2'/>
+
+
+    <service type="beast.base.evolution.datatype.DataType">
+        <provider classname="beast.base.evolution.datatype.Aminoacid"/>
+        <provider classname="beast.base.evolution.datatype.Nucleotide"/>
+        <provider classname="beast.base.evolution.datatype.TwoStateCovarion"/>
+        <provider classname="beast.base.evolution.datatype.Binary"/>
+        <provider classname="beast.base.evolution.datatype.IntegerData"/>
+        <provider classname="beast.base.evolution.datatype.StandardData"/>
+        <provider classname="beast.base.evolution.datatype.UserDataType"/>
+    </service>
+
+    <service type="beast.base.inference.ModelLogger">
+        <provider classname="beast.base.inference.ModelLogger"/>
+        <provider classname="beast.base.parser.XMLModelLogger"/>
+    </service>
+
+    <service type="beast.base.core.BEASTInterface">
+
+        <provider classname="beast.base.evolution.branchratemodel.RandomLocalClockModel"/>
+        <provider classname="beast.base.evolution.branchratemodel.StrictClockModel"/>
+        <provider classname="beast.base.evolution.branchratemodel.UCRelaxedClockModel"/>
+        <provider classname="mixture.beast.evolution.clockmodel.auto.AutoCorrelatedClockModel"/>
+        <provider classname="mixture.beast.evolution.clockmodel.auto.AutoCorrelatedPrior"/>
+        <provider classname="mixture.beast.evolution.clockmodel.auto.MeanZCalculator"/>
+        <provider classname="mixture.beast.evolution.mixture.MixtureTreeLikelihood"/>
+        <provider classname="mixture.beast.evolution.mixture.MixtureLikelihoodLogger"/>
+        <provider classname="mixture.beast.evolution.clockmodel.auto.CategoricalDistribution"/>
+
+
+        <provider classname="mixture.beast.evolution.operator.AlphaAnnealingOperator"/>
+        <provider classname="mixture.beast.evolution.operator.GlobalLogRateShiftOperator"/>
+
+
+
+
+    </service>
+</package>

@@ -1,0 +1,70 @@
+package mixture.lphybeast.tobeast.generators;
+
+import beast.base.core.BEASTInterface;
+import beast.base.evolution.tree.TreeInterface;
+import beast.base.inference.StateNode;
+import beast.base.inference.operator.kernel.BactrianRandomWalkOperator;
+import beast.base.inference.parameter.RealParameter;
+import lphy.base.evolution.continuous.AutoCorrelatedLogRates;
+import lphybeast.BEASTContext;
+import lphybeast.GeneratorToBEAST;
+import mixture.beast.evolution.clockmodel.auto.AutoCorrelatedPrior;
+
+public class AutoCorrelatedLogRatesToBEAST implements GeneratorToBEAST<AutoCorrelatedLogRates, AutoCorrelatedPrior> {
+
+    @Override
+    public AutoCorrelatedPrior generatorToBEAST(AutoCorrelatedLogRates dist,
+                                                BEASTInterface beastValue,
+                                                BEASTContext context) {
+
+        if (!(beastValue instanceof RealParameter)) {
+            throw new IllegalArgumentException("AutoCorrelatedLogRates must map to a RealParameter!");
+        }
+
+        RealParameter beastNodeLogRate = (RealParameter) beastValue;
+
+        TreeInterface beastTree = (TreeInterface) context.getBEASTObject(dist.getTree());
+        RealParameter beastSigma2      = context.getAsRealParameter(dist.getSigma2());
+        RealParameter beastRootLogRate = context.getAsRealParameter(dist.getRootLogRate());
+
+        AutoCorrelatedPrior acPrior = new AutoCorrelatedPrior();
+        acPrior.setID("AutoCorrPrior." + dist.getUniqueId());
+
+        acPrior.setInputValue("tree",        beastTree);
+        acPrior.setInputValue("sigma2",      beastSigma2);
+        acPrior.setInputValue("rootLogRate", beastRootLogRate);
+        acPrior.setInputValue("nodeRates",   beastNodeLogRate);
+
+        // Local move for nodeLogRates (still needed)
+        BactrianRandomWalkOperator rw = new BactrianRandomWalkOperator();
+        rw.setID("nodeLogRates.rw." + dist.getUniqueId());
+        rw.setInputValue("parameter",  beastNodeLogRate);
+        rw.setInputValue("windowSize", 0.20);
+        rw.setInputValue("weight",     12.0);
+        rw.initAndValidate();
+        context.addExtraOperator(rw);
+
+        // Prevent default operator from being added by the framework
+        if (beastNodeLogRate instanceof StateNode) {
+            context.addSkipOperator((StateNode) beastNodeLogRate);
+        }
+
+        context.addBEASTObject(acPrior, dist);
+
+        // Avoid logging large vectors unless you want them
+        context.addSkipLoggable(beastNodeLogRate);
+
+        acPrior.initAndValidate();
+        return acPrior;
+    }
+
+    @Override
+    public Class<AutoCorrelatedLogRates> getGeneratorClass() {
+        return AutoCorrelatedLogRates.class;
+    }
+
+    @Override
+    public Class<AutoCorrelatedPrior> getBEASTClass() {
+        return AutoCorrelatedPrior.class;
+    }
+}

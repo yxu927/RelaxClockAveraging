@@ -1,4 +1,4 @@
-<package name="BEAST.base" version="2.7.7">
+<package name="BEAST.base" version="2.7.8">
 <!-- note version="2.7.x" must be double quotes for Mac release script release/Mac/createdmg.sh -->
 
             <!-- data types -->
@@ -181,25 +181,5 @@
                 <provider classname="beast.base.inference.parameter.RealParameterList"/>
                 <provider classname="beast.base.inference.util.ESS"/>
                 <provider classname="beast.base.inference.util.RPNcalculator"/>
-                <provider classname="rc.beast.evolution.clockmodel.AutoCorrelatedClockModel"/>
-                <provider classname="rc.beast.evolution.clockmodel.AutoCorrelatedPrior"/>
-                <provider classname="rc.beast.evolution.clockmodel.MeanZCalculator"/>
-
-                <provider classname="rc.beast.evolution.clockmodel.MixtureTreeLikelihood"/>
-
-                <provider classname="rc.beast.evolution.clockmodel.IfElseRealParameter"/>
-
-                <provider classname="rc.beast.evolution.clockmodel.CategoricalDistribution"/>
-
-                <provider classname="rc.beast.evolution.clockmodel.MixtureLikelihoodLogger"/>
-
-                <provider classname="rc.beast.evolution.clockmodel.AlphaAnnealingOperator"/>
-                <provider classname="rc.beast.evolution.clockmodel.GlobalLogRateShiftOperator"/>
-                <provider classname="rc.beast.evolution.clockmodel.TreeLogRateScaleOperator"/>
-
-
-
-
-
             </service>
 </package>

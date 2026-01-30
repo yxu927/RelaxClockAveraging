@@ -1,0 +1,53 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+<modelVersion>4.0.0</modelVersion>
+
+    <groupId>io.github.yxu927</groupId>
+
+
+<!--    <groupId>io.github.linguaphylo</groupId>-->
+    <artifactId>RelaxClockAveraging</artifactId>
+
+    <version>0.1.0</version>
+    <packaging>pom</packaging>
+
+    <name>RelaxClockAveraging</name>
+
+    <properties>
+        <lphy.version>1.7.0</lphy.version>
+        <lphybeast.version>1.2.1</lphybeast.version>
+        <!--  include lphybeast  -->
+        <lphybeast.flc.version>0.0.1-SNAPSHOT</lphybeast.flc.version>
+        <!-- phylonco pom version https://maven.apache.org/maven-ci-friendly.html -->
+
+        <revision>0.1.0</revision>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+
+    <modules>
+        <!-- this already has linguaPhylo, importing again will cause duplication err -->
+        <module>../LPhyBeast/</module>
+        <module>mixture-beast</module>
+        <module>mixture-lphy</module>
+        <module>mixture-lphy-studio</module>
+        <module>mixture-lphybeast</module>
+    </modules>
+
+    <dependencies>
+<!--        <dependency>-->
+<!--            <groupId>org.junit.jupiter</groupId>-->
+<!--            <artifactId>junit-jupiter</artifactId>-->
+<!--            <version>5.9.2</version>-->
+<!--            <scope>test</scope>-->
+<!--        </dependency>-->
+        <!-- TODO : why not junit 5 ?   -->
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>4.13.2</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

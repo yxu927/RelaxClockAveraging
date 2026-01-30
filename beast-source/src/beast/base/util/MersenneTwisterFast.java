@@ -157,7 +157,7 @@ public class MersenneTwisterFast implements Serializable {
      *
      * @param seed generator starting number, often the time of day.
      */
-    private MersenneTwisterFast(long seed) {
+    protected MersenneTwisterFast(long seed) {
         if (seed == 0) {
             setSeed(GOOD_SEED);
         } else {
@@ -338,7 +338,7 @@ public class MersenneTwisterFast implements Serializable {
     }
 
 
-    public final double nextDouble() {
+    public double nextDouble() {
         int y;
         int z;
 

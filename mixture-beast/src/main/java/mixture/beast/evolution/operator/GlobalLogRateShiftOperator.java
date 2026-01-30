@@ -1,4 +1,4 @@
-package rc.beast.evolution.clockmodel;
+package mixture.beast.evolution.operator;
 
 import beast.base.core.Description;
 import beast.base.core.Input;
