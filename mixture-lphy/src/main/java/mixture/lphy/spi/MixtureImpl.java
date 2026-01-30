@@ -43,6 +43,6 @@ public class MixtureImpl extends LPhyBaseImpl {
     }
 
     public String getExtensionName() {
-        return "Phylonco lphy library";
+        return "mixture lphy library";
     }
 }

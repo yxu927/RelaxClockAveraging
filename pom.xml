@@ -18,7 +18,7 @@
         <lphybeast.version>1.2.1</lphybeast.version>
         <!--  include lphybeast  -->
         <lphybeast.flc.version>0.0.1-SNAPSHOT</lphybeast.flc.version>
-        <!-- phylonco pom version https://maven.apache.org/maven-ci-friendly.html -->
+        <!-- mixture pom version https://maven.apache.org/maven-ci-friendly.html -->
 
         <revision>0.1.0</revision>
         <maven.compiler.source>17</maven.compiler.source>
