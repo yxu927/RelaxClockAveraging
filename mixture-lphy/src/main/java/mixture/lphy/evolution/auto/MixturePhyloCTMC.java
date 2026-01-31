@@ -3,7 +3,7 @@ package mixture.lphy.evolution.auto;
 import lphy.base.distribution.Categorical;
 import lphy.base.evolution.alignment.Alignment;
 import lphy.base.evolution.likelihood.AbstractPhyloCTMC;
-import lphy.base.evolution.likelihood.PhyloLikelihood;
+
 import lphy.base.evolution.tree.TimeTree;
 import lphy.core.model.*;
 import lphy.core.model.annotation.GeneratorCategory;
