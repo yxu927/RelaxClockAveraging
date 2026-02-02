@@ -14,8 +14,8 @@ model {
   rootLogRate ~ Normal(mean=0, sd=0.4);
   σ2 ~ LogNormal(meanlog=-1.5, sdlog=0.5);
   w_relax = [1.0/2, 1.0/2];
-  //i_relax ~ Categorical(p=w_relax);
-  i_relax=0;
+  i_relax ~ Categorical(p=w_relax);
+
   rawRates ~ SVSRawBranchRates(tree=ψ,indicator=i_relax,ucldStdev=sigmaUCLN,sigma2=σ2,
       rootLogRate=rootLogRate);
   meanRate = 1.0;
