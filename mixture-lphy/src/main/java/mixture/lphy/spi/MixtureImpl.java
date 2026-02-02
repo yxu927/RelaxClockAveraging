@@ -4,9 +4,7 @@ package mixture.lphy.spi;
 import lphy.base.spi.LPhyBaseImpl;
 import lphy.core.model.BasicFunction;
 import lphy.core.model.GenerativeDistribution;
-import mixture.lphy.evolution.auto.AutoCorrelatedClock;
-import mixture.lphy.evolution.auto.AutoCorrelatedLogRates;
-import mixture.lphy.evolution.auto.MixturePhyloCTMC;
+import mixture.lphy.evolution.auto.*;
 
 import java.util.Arrays;
 import java.util.List;
@@ -28,7 +26,7 @@ public class MixtureImpl extends LPhyBaseImpl {
     @Override
     public List<Class<? extends GenerativeDistribution>> declareDistributions() {
         return Arrays.asList(
-                AutoCorrelatedLogRates.class, MixturePhyloCTMC.class
+                AutoCorrelatedLogRates.class, MixturePhyloCTMC.class, SVSRawBranchRates.class
 
         );
     }
@@ -36,7 +34,7 @@ public class MixtureImpl extends LPhyBaseImpl {
     @Override
     public List<Class<? extends BasicFunction>> declareFunctions() {
         return Arrays.asList(
-                AutoCorrelatedClock.class
+                AutoCorrelatedClock.class, SharedRatesClock.class,ChooseAlignment.class
 
 
         );

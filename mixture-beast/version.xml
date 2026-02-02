@@ -30,11 +30,13 @@
         <provider classname="mixture.beast.evolution.mixture.MixtureTreeLikelihood"/>
         <provider classname="mixture.beast.evolution.mixture.MixtureLikelihoodLogger"/>
         <provider classname="mixture.beast.evolution.clockmodel.auto.CategoricalDistribution"/>
+        <provider classname="mixture.beast.evolution.mixture.RelaxedRatesPriorSVS"/>
+        <provider classname="mixture.beast.evolution.mixture.SharedRatesClockModel"/>
 
 
         <provider classname="mixture.beast.evolution.operator.AlphaAnnealingOperator"/>
         <provider classname="mixture.beast.evolution.operator.GlobalLogRateShiftOperator"/>
-
+        <provider classname="mixture.beast.evolution.operator.IndicatorFlipOperator"/>
 
 
 

@@ -3,7 +3,6 @@ package mixture.lphy.evolution.auto;
 import lphy.base.distribution.Categorical;
 import lphy.base.evolution.alignment.Alignment;
 import lphy.base.evolution.likelihood.AbstractPhyloCTMC;
-
 import lphy.base.evolution.tree.TimeTree;
 import lphy.core.model.*;
 import lphy.core.model.annotation.GeneratorCategory;
@@ -12,6 +11,8 @@ import lphy.core.model.annotation.ParameterInfo;
 import lphy.core.simulator.RandomUtils;
 import org.apache.commons.math3.random.RandomGenerator;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.Objects;
 import java.util.SortedMap;
 import java.util.TreeMap;
@@ -22,14 +23,14 @@ public final class MixturePhyloCTMC implements GenerativeDistribution<Alignment>
     public static final String COMP2   = "comp2";
     public static final String COMP3   = "comp3";
     public static final String WEIGHTS = "weights";
-    public static final String INDEX   = "index";
+    public static final String INDEX   = "index"; // simulation only
 
     private Value<Alignment> comp1;
     private Value<Alignment> comp2;
-    private Value<Alignment> comp3;
+    private Value<Alignment> comp3; // optional
     private Value<Double[]>  weights;
+    private Value<Integer>   index; // optional
 
-    private Value<Integer>   index;
     private AbstractPhyloCTMC[] gens;
     private final RandomGenerator rng = RandomUtils.getRandom();
 
@@ -47,7 +48,7 @@ public final class MixturePhyloCTMC implements GenerativeDistribution<Alignment>
         this.comp2   = Objects.requireNonNull(comp2,   "comp2 is required");
         this.comp3   = null;
         this.weights = Objects.requireNonNull(weights, "weights is required");
-        this.index   = index;
+        this.index   = index; // may be null
         rebuildGensAndValidate();
     }
 
@@ -67,12 +68,11 @@ public final class MixturePhyloCTMC implements GenerativeDistribution<Alignment>
         this.comp2   = Objects.requireNonNull(comp2,   "comp2 is required");
         this.comp3   = Objects.requireNonNull(comp3,   "comp3 is required");
         this.weights = Objects.requireNonNull(weights, "weights is required");
-        this.index   = index;
+        this.index   = index; // may be null
         rebuildGensAndValidate();
     }
 
     private void rebuildGensAndValidate() {
-
         final int nComp = (comp3 == null) ? 2 : 3;
 
         Generator g1 = Objects.requireNonNull(comp1.getGenerator(),
@@ -94,7 +94,6 @@ public final class MixturePhyloCTMC implements GenerativeDistribution<Alignment>
             }
             gens = new AbstractPhyloCTMC[]{ (AbstractPhyloCTMC) g1, (AbstractPhyloCTMC) g2, (AbstractPhyloCTMC) g3 };
         }
-
 
         Double[] w = weights.value();
         if (w == null || w.length != nComp) {
@@ -124,42 +123,104 @@ public final class MixturePhyloCTMC implements GenerativeDistribution<Alignment>
             narrativeName = "phylogenetic CTMC mixture",
             examples = {"mixtureLikelihood.lphy"},
             category = GeneratorCategory.PHYLO_LIKELIHOOD,
-            description = "Mixture (convex combination) of two or three component phylogenetic likelihoods that apply to the same alignment."
+            description = "Mixture of two or three component phylogenetic likelihoods that apply to the same alignment."
     )
     @Override
     public RandomVariable<Alignment> sample() {
         final int nComp = (comp3 == null) ? 2 : 3;
 
+        // Case 1: index provided -> choose deterministically, and ensure that component is sampled & written back.
         if (index != null) {
             int k = index.value();
-            Alignment chosen;
-            if (k == 0) {
-                chosen = comp1.value();
-            } else if (k == 1) {
-                chosen = comp2.value();
-            } else if (k == 2 && nComp == 3) {
-                chosen = comp3.value();
-            } else {
+            if (k < 0 || k >= nComp) {
                 throw new IllegalArgumentException("index out of range for " + nComp + " components: " + k);
             }
-
-            if (chosen == null) {
-                RandomVariable<Alignment> rv = gens[k].sample();
-                chosen = rv.value();
-            }
+            Alignment chosen = ensureComponentSampledAndWrittenBack(k);
             return new RandomVariable<>("D", chosen, this);
         }
 
+        // Case 2: no index -> choose by weights, ensure sampled & written back (so UI shows the chosen component too).
         int k = Categorical.sample(weights.value(), rng);
-        RandomVariable<Alignment> rv = gens[k].sample();
-        return new RandomVariable<>("D", rv.value(), this);
+        Alignment chosen = ensureComponentSampledAndWrittenBack(k);
+        return new RandomVariable<>("D", chosen, this);
+    }
+
+    /**
+     * Ensure component k has a realised Alignment.
+     * If compk.value() is null, sample gens[k] once and WRITE BACK to compk (best-effort).
+     */
+    private Alignment ensureComponentSampledAndWrittenBack(int k) {
+        Value<Alignment> target = getCompValueByIndex(k);
+
+        Alignment existing = (target == null) ? null : target.value();
+        if (existing != null) {
+            return existing;
+        }
+
+        Alignment sampled = gens[k].sample().value();
+
+        if (target != null && sampled != null) {
+            boolean ok = tryWriteBackValue(target, sampled);
+            if (!ok) {
+                System.err.println("[MixturePhyloCTMC] Warning: could not write back sampled Alignment to component " + k +
+                        " (UI may show component as null / not synchronized).");
+            }
+        }
+
+        return sampled;
+    }
+
+    private Value<Alignment> getCompValueByIndex(int k) {
+        if (k == 0) return comp1;
+        if (k == 1) return comp2;
+        if (k == 2) return comp3;
+        throw new IllegalArgumentException("component index out of range: " + k);
+    }
+
+
+    private static boolean tryWriteBackValue(Value<Alignment> target, Alignment newVal) {
+        // 1) Try public/protected method setValue(...)
+        try {
+            Method m = null;
+
+            // try exact name: setValue(T)
+            for (Method cand : target.getClass().getMethods()) {
+                if (cand.getName().equals("setValue") && cand.getParameterCount() == 1) {
+                    m = cand;
+                    break;
+                }
+            }
+            if (m != null) {
+                m.invoke(target, newVal);
+                return true;
+            }
+        } catch (Throwable ignored) {}
+
+        try {
+            Field f = null;
+            Class<?> c = target.getClass();
+            while (c != null && f == null) {
+                try {
+                    f = c.getDeclaredField("value");
+                } catch (NoSuchFieldException e) {
+                    c = c.getSuperclass();
+                }
+            }
+            if (f != null) {
+                f.setAccessible(true);
+                f.set(target, newVal);
+                return true;
+            }
+        } catch (Throwable ignored) {}
+
+        return false;
     }
 
     @Override
     public SortedMap<String, Value> getParams() {
         SortedMap<String, Value> map = new TreeMap<>();
-        map.put(COMP1,   comp1);
-        map.put(COMP2,   comp2);
+        map.put(COMP1, comp1);
+        map.put(COMP2, comp2);
         if (comp3 != null) map.put(COMP3, comp3);
         map.put(WEIGHTS, weights);
         if (index != null) map.put(INDEX, index);

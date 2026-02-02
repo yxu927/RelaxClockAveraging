@@ -38,7 +38,7 @@ public class LBMixture implements LPhyBEASTExt {
         return Arrays.asList(
                 AutoCorrelatedClockToBEAST.class, AutoCorrelatedLogRatesToBEAST.class,
               MixturePhyloCTMCToBEAST.class,
-                CategoricalToBEAST.class
+                CategoricalToBEAST.class,SharedRatesClockToBEAST.class,SVSRawBranchRatesToBEAST.class
         );
     }
 
