@@ -42,7 +42,7 @@
         <provider classname="mixture.beast.evolution.operator.SingleRateScaleOperator"/>
 
 
-
+        <provider classname="mixture.beast.evolution.operator.IndicatorSwitchResampleRatesOperator"/>
 
 
 
