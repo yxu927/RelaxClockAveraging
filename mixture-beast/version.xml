@@ -36,7 +36,14 @@
 
         <provider classname="mixture.beast.evolution.operator.AlphaAnnealingOperator"/>
         <provider classname="mixture.beast.evolution.operator.GlobalLogRateShiftOperator"/>
-        <provider classname="mixture.beast.evolution.operator.IndicatorFlipOperator"/>
+<!--        <provider classname="mixture.beast.evolution.operator.IndicatorFlipOperator"/>-->
+        <provider classname="mixture.beast.evolution.operator.IndicatorGibbsOperator"/>
+        <provider classname="mixture.beast.evolution.operator.SubtreeRateScaleOperator"/>
+        <provider classname="mixture.beast.evolution.operator.SingleRateScaleOperator"/>
+
+
+
+
 
 
 

@@ -3,17 +3,19 @@ package mixture.lphybeast.tobeast.generators;
 import beast.base.core.BEASTInterface;
 import beast.base.evolution.tree.TreeInterface;
 import beast.base.inference.StateNode;
-import beast.base.inference.operator.kernel.BactrianRandomWalkOperator;
 import beast.base.inference.parameter.IntegerParameter;
 import beast.base.inference.parameter.RealParameter;
 import lphy.base.evolution.tree.TimeTree;
 import lphy.core.model.Value;
 import lphybeast.BEASTContext;
-
 import lphybeast.GeneratorToBEAST;
 import mixture.beast.evolution.mixture.RelaxedRatesPriorSVS;
-import mixture.beast.evolution.operator.IndicatorFlipOperator;
-import mixture.lphy.evolution.auto.SVSRawBranchRates;
+
+import lphy.base.evolution.continuous.SVSRawBranchRates;
+
+import mixture.beast.evolution.operator.IndicatorGibbsOperator;
+import mixture.beast.evolution.operator.SingleRateScaleOperator;
+import mixture.beast.evolution.operator.SubtreeRateScaleOperator;
 
 import java.util.StringJoiner;
 
@@ -22,7 +24,6 @@ public class SVSRawBranchRatesToBEAST implements GeneratorToBEAST<SVSRawBranchRa
     @Override
     public RelaxedRatesPriorSVS generatorToBEAST(SVSRawBranchRates dist, BEASTInterface beastValue, BEASTContext context) {
 
-        // Inputs from LPhy
         @SuppressWarnings("unchecked")
         Value<TimeTree> treeVal = (Value<TimeTree>) dist.getParams().get(SVSRawBranchRates.TREE);
 
@@ -39,24 +40,21 @@ public class SVSRawBranchRatesToBEAST implements GeneratorToBEAST<SVSRawBranchRa
         Value<Double> rootVal = (Value<Double>) dist.getParams().get(SVSRawBranchRates.ROOT_LOG_RATE);
 
         TreeInterface beastTree = (TreeInterface) context.getBEASTObject(treeVal);
-
         Value<?> outVal = context.getOutput(dist);
 
+        // ---- rates parameter ----
         RealParameter ratesParam;
         if (beastValue instanceof RealParameter rp) {
             ratesParam = rp;
         } else {
-            // Create from scratch if needed
             ratesParam = new RealParameter();
             ratesParam.setID("rawRates." + dist.getUniqueId());
         }
 
-        // Ensure dimension (nodeCount - 1)
         int nNodes = ((beast.base.evolution.tree.Tree) beastTree).getNodeCount();
         int targetDim = nNodes - 1;
 
         if (ratesParam.getDimension() != targetDim) {
-            // Replace mapping with a fresh parameter of correct size
             RealParameter newRates = new RealParameter();
             newRates.setID("rawRates." + dist.getUniqueId());
 
@@ -68,25 +66,21 @@ public class SVSRawBranchRatesToBEAST implements GeneratorToBEAST<SVSRawBranchRa
             newRates.setInputValue("estimate", true);
             newRates.initAndValidate();
 
-            // remove old object if it was registered
             if (beastValue != null) {
                 context.removeBEASTObject(beastValue);
             }
             context.putBEASTObject(outVal, newRates);
             ratesParam = newRates;
         } else {
-            // Make sure it's positive-constrained
             ratesParam.setLower(0.0);
         }
 
-        // ---- Indicator parameter ----
-        // Prefer IntegerParameter so the flip operator is clean.
+        // ---- indicator parameter ----
         IntegerParameter indParam;
         BEASTInterface indObj = context.getBEASTObject(indVal);
         if (indObj instanceof IntegerParameter ip) {
             indParam = ip;
         } else {
-            // Fallback: construct it (e.g. if the framework doesn't provide IntegerParameter)
             indParam = new IntegerParameter();
             indParam.setID("indicator." + dist.getUniqueId());
             indParam.setInputValue("value", "0");
@@ -97,12 +91,12 @@ public class SVSRawBranchRatesToBEAST implements GeneratorToBEAST<SVSRawBranchRa
             context.putBEASTObject(indVal, indParam);
         }
 
-        // Hyperparameters
+        // ---- hyperparameters ----
         RealParameter ucldStdev = context.getAsRealParameter(ucldVal);
         RealParameter sigma2 = context.getAsRealParameter(sigma2Val);
         RealParameter rootLogRate = context.getAsRealParameter(rootVal);
 
-        // ---- SVS prior distribution ----
+        // ---- SVS prior ----
         RelaxedRatesPriorSVS prior = new RelaxedRatesPriorSVS();
         prior.setID("SVSRelaxedClockPrior." + dist.getUniqueId());
 
@@ -113,28 +107,44 @@ public class SVSRawBranchRatesToBEAST implements GeneratorToBEAST<SVSRawBranchRa
         prior.setInputValue("sigma2", sigma2);
         prior.setInputValue("rootLogRate", rootLogRate);
 
+        // Optional: if you want to be lenient with tiny branches
+        // prior.setInputValue("minBranchLength", 1e-12);
+
         prior.initAndValidate();
         context.addBEASTObject(prior, dist);
 
         // ---- Operators ----
-        // 1) Rate vector move (placeholder: RW in rate-space; OK to start, but scale-type is usually better)
-        BactrianRandomWalkOperator rw = new BactrianRandomWalkOperator();
-        rw.setID("rawRates.rw." + dist.getUniqueId());
-        rw.setInputValue("parameter", ratesParam);
-        rw.setInputValue("windowSize", 0.10);
-        rw.setInputValue("weight", 10.0);
-        rw.initAndValidate();
-        context.addExtraOperator(rw);
 
-        // 2) Flip indicator 0<->1
-        IndicatorFlipOperator flip = new IndicatorFlipOperator();
-        flip.setID("indicator.flip." + dist.getUniqueId());
-        flip.setInputValue("indicator", indParam);
-        flip.setInputValue("weight", 2.0);
-        flip.initAndValidate();
-        context.addExtraOperator(flip);
+        // 1) Single-dimension multiplicative scale on positive rates
+        SingleRateScaleOperator oneScale = new SingleRateScaleOperator();
+        oneScale.setID("rawRates.oneScale." + dist.getUniqueId());
+        oneScale.setInputValue("rates", ratesParam);
+        oneScale.setInputValue("window", 0.3);
+        oneScale.setInputValue("weight", 15.0);
+        oneScale.initAndValidate();
+        context.addExtraOperator(oneScale);
 
-        // Prevent default operators / loggers
+        // 2) Subtree correlated scale move (very useful for AC)
+        SubtreeRateScaleOperator subScale = new SubtreeRateScaleOperator();
+        subScale.setID("rawRates.subtreeScale." + dist.getUniqueId());
+        subScale.setInputValue("tree", beastTree);
+        subScale.setInputValue("rates", ratesParam);
+        subScale.setInputValue("window", 0.25);
+        subScale.setInputValue("weight", 10.0);
+        subScale.initAndValidate();
+        context.addExtraOperator(subScale);
+
+        // 3) Gibbs-style indicator update (replaces flip)
+        IndicatorGibbsOperator gibbs = new IndicatorGibbsOperator();
+        gibbs.setID("indicator.gibbs." + dist.getUniqueId());
+        gibbs.setInputValue("indicator", indParam);
+        gibbs.setInputValue("prior", prior);
+        gibbs.setInputValue("pOne", 0.5);   // should match your Categorical prior weights
+        gibbs.setInputValue("weight", 2.0);
+        gibbs.initAndValidate();
+        context.addExtraOperator(gibbs);
+
+        // Prevent default operators/loggers for these
         if (ratesParam instanceof StateNode) context.addSkipOperator((StateNode) ratesParam);
         if (indParam instanceof StateNode) context.addSkipOperator((StateNode) indParam);
 
