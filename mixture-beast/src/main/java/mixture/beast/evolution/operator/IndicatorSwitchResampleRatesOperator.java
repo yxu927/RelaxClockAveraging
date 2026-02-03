@@ -23,6 +23,13 @@ public class IndicatorSwitchResampleRatesOperator extends Operator {
             Input.Validate.REQUIRED
     );
 
+    public final Input<IntegerParameter> indicatorInput = new Input<>(
+            "indicator", "SVS indicator", Input.Validate.REQUIRED);
+
+    public final Input<RealParameter> ratesInput = new Input<>(
+            "rates", "raw branch rates", Input.Validate.REQUIRED);
+
+
     private RelaxedRatesPriorSVS prior;
 
     private Tree tree;
@@ -41,7 +48,8 @@ public class IndicatorSwitchResampleRatesOperator extends Operator {
     @Override
     public void initAndValidate() {
         prior = priorInput.get();
-
+        indicator = indicatorInput.get();
+        rates = ratesInput.get();
         // Grab the SAME objects used by the prior
         tree = prior.treeInput.get();
         rates = prior.ratesInput.get();
