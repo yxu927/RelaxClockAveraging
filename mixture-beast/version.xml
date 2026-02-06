@@ -29,6 +29,7 @@
         <provider classname="mixture.beast.evolution.clockmodel.auto.MeanZCalculator"/>
         <provider classname="mixture.beast.evolution.mixture.MixtureTreeLikelihood"/>
         <provider classname="mixture.beast.evolution.mixture.MixtureLikelihoodLogger"/>
+        <provider classname="mixture.beast.evolution.mixture.HierarchicalSVSLogger"/>
         <provider classname="mixture.beast.evolution.clockmodel.auto.CategoricalDistribution"/>
         <provider classname="mixture.beast.evolution.mixture.RelaxedRatesPriorSVS"/>
         <provider classname="mixture.beast.evolution.mixture.SharedRatesClockModel"/>
