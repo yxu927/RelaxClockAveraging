@@ -11,9 +11,7 @@ import beast.base.inference.parameter.RealParameter;
 
 import java.util.Arrays;
 
-@Description("Clock model that reads a shared vector of positive branch rates (non-root nodes). "
-        + "Optional normalization rescales the time-weighted mean rate across the tree to 1. "
-        + "A separate meanRate multiplier can set the absolute scale.")
+
 public class SharedRatesClockModel extends BranchRateModel.Base {
 
     public final Input<Tree> treeInput = new Input<>(
@@ -128,7 +126,7 @@ public class SharedRatesClockModel extends BranchRateModel.Base {
         final int nr = node.getNr();
         final int idx = idxMap[nr];
         if (idx < 0) {
-            // should never happen for non-root nodes
+
             return 0.0;
         }
 
@@ -140,10 +138,6 @@ public class SharedRatesClockModel extends BranchRateModel.Base {
         return r * scaleFactor * mr;
     }
 
-    /**
-     * Computes a scale factor so that the time-weighted mean rate across the tree equals 1.
-     * Only used when normalize=true.
-     */
     private void computeScaleFactor() {
         double sumRateTime = 0.0;
         double sumTime = 0.0;

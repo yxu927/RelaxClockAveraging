@@ -148,7 +148,6 @@ public class RelaxedRatesPriorSVS extends Distribution {
     }
 
     /**
-     * Exposed UC log-density for use by a Gibbs-style indicator operator.
      * UC: r_i ~ LogNormal(mu, s), i.i.d. in RATE space, with E[r]=1.
      */
     public double logPriorUCOnly() {
@@ -156,36 +155,27 @@ public class RelaxedRatesPriorSVS extends Distribution {
         if (!(s > 0.0)) return Double.NEGATIVE_INFINITY;
 
         final double s2 = s * s;
-        final double mu = -0.5 * s2; // ensures E[r]=1
+        final double mu = -0.5 * s2;
 
         final double logSqrt2Pi = 0.5 * Math.log(2.0 * Math.PI);
 
         double lp = 0.0;
 
-        // LogNormal pdf on rate r:
-        // log f(r) = -log(r) -log(s) -0.5*log(2*pi) - (log(r)-mu)^2/(2*s^2)
         for (int i = 0; i < rates.getDimension(); i++) {
             final double r = rates.getValue(i);
             if (!(r > 0.0)) return Double.NEGATIVE_INFINITY;
 
             final double x = Math.log(r);
             final double z = (x - mu);
+
+//log density
             lp += -x - Math.log(s) - logSqrt2Pi - 0.5 * (z * z) / s2;
         }
 
         return lp;
     }
 
-    /**
-     * Exposed AC log-density for use by a Gibbs-style indicator operator.
-     *
-     * AC increments (mean-corrected):
-     * log(r_child) | log(r_parent) ~ Normal( log(r_parent) - 0.5*var, var ), var = sigma2 * dt
-     * => r_child | r_parent ~ LogNormal( log(r_parent) - 0.5*var, sqrt(var) ) with mean r_parent
-     *
-     * Since the parameter is r (rate space), we include Jacobian term -log(r_child) for each child rate.
-     * rootLogRate (if provided) is used as log(r_parent) for edges descending from the root; otherwise 0.
-     */
+
     public double logPriorACOnly() {
         final double s2 = sigma2.getValue();
         if (!(s2 > 0.0)) return Double.NEGATIVE_INFINITY;
@@ -204,8 +194,7 @@ public class RelaxedRatesPriorSVS extends Distribution {
 
             final double dt = node.getLength();
             if (!(dt > minDt)) {
-                // If you want to allow zero-length branches, set minBranchLength very small (e.g. 1e-12),
-                // or change this to: dt = minDt (but that changes the model).
+
                 return Double.NEGATIVE_INFINITY;
             }
 
@@ -233,13 +222,14 @@ public class RelaxedRatesPriorSVS extends Distribution {
                 logPar = Math.log(rPar);
             }
 
-            // Mean correction so that E[r_child | r_parent] = r_parent
             final double mean = logPar - 0.5 * var;
-
             final double z = logChi - mean;
+
+
+            //log density (Normal) and Jacobin(log rate -----rate space)
+
             lp += -0.5 * (log2Pi + Math.log(var) + (z * z) / var);
 
-            // Jacobian for x=log(r): log|dx/dr| = -log(r)
             lp += -logChi;
         }
 

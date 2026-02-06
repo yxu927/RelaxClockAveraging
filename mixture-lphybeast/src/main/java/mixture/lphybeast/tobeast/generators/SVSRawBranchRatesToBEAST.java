@@ -14,6 +14,7 @@ import mixture.beast.evolution.mixture.RelaxedRatesPriorSVS;
 import lphy.base.evolution.continuous.SVSRawBranchRates;
 
 import mixture.beast.evolution.operator.IndicatorGibbsOperator;
+import mixture.beast.evolution.operator.IndicatorSwitchResampleRatesOperator;
 import mixture.beast.evolution.operator.SingleRateScaleOperator;
 import mixture.beast.evolution.operator.SubtreeRateScaleOperator;
 
@@ -143,6 +144,16 @@ public class SVSRawBranchRatesToBEAST implements GeneratorToBEAST<SVSRawBranchRa
         gibbs.setInputValue("weight", 2.0);
         gibbs.initAndValidate();
         context.addExtraOperator(gibbs);
+
+
+        IndicatorSwitchResampleRatesOperator switchResampleRates = new IndicatorSwitchResampleRatesOperator();
+
+        switchResampleRates.setInputValue("prior", prior);
+        switchResampleRates.setInputValue("weight", 2.0);
+        switchResampleRates.setInputValue("indicator", indParam);
+        switchResampleRates.setInputValue("rates", ratesParam);
+        switchResampleRates.initAndValidate();
+        context.addExtraOperator(switchResampleRates);
 
         // Prevent default operators/loggers for these
         if (ratesParam instanceof StateNode) context.addSkipOperator((StateNode) ratesParam);
