@@ -147,7 +147,7 @@ public class MixturePhyloCTMCToBEAST implements GeneratorToBEAST<MixturePhyloCTM
             hierLogger.setInputValue("svsPrior", svsPrior);
 
             hierLogger.setInputValue("printThreeModelWeights", true);
-            hierLogger.setInputValue("printConditionalMeans", true);
+            hierLogger.setInputValue("printRBStats", true);
 
             hierLogger.initAndValidate();
             context.addExtraLoggable(hierLogger);
