@@ -128,8 +128,6 @@ public class MixturePhyloCTMCToBEAST implements
 
         MixtureLikelihoodLogger allocLogger = new MixtureLikelihoodLogger();
         allocLogger.setInputValue("mixture", beastMix);
-        allocLogger.setInputValue("printWeights", true);
-        allocLogger.setInputValue("printLogL", false);
         allocLogger.setInputValue("printResp", true);
 
         allocLogger.initAndValidate();

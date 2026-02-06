@@ -20,7 +20,7 @@ public class MixtureLikelihoodLogger extends BEASTObject implements Loggable {
             new Input<>("mixture", "MixtureTreeLikelihood to log", Validate.REQUIRED);
 
     public final Input<Boolean> printTotalLogPInput =
-            new Input<>("printTotalLogP", "print total logP (logMix + couplingTerm)", true);
+            new Input<>("printTotalLogP", "print total logP (logMix + couplingTerm)", false);
 
     public final Input<Boolean> printLogMixInput =
             new Input<>("printLogMix", "print logMix only (log-sum-exp of w_k * exp(logL_k))", false);
@@ -35,10 +35,10 @@ public class MixtureLikelihoodLogger extends BEASTObject implements Loggable {
             new Input<>("printSumWeights", "print sum_k w_k", false);
 
     public final Input<Boolean> printWeightsInput =
-            new Input<>("printWeights", "print mixture weights w_k", true);
+            new Input<>("printWeights", "print mixture weights w_k", false);
 
     public final Input<Boolean> printLogLInput =
-            new Input<>("printLogL", "print component log-likelihoods logL_k", true);
+            new Input<>("printLogL", "print component log-likelihoods logL_k", false);
 
     public final Input<Boolean> printLogSInput =
             new Input<>("printLogS", "print logS_k = log(w_k) + logL_k", false);
