@@ -12,9 +12,7 @@ import mixture.beast.evolution.mixture.RelaxedRatesPriorSVS;
 
 import java.util.Arrays;
 
-@Description("Bridge move for SVS: flip indicator (0<->1) AND resample the entire rawRates vector "
-        + "from the target model's prior (UC or AC) given current hyperparameters. "
-        + "This helps the chain move between the UC-mode and AC-mode basins.")
+
 public class IndicatorSwitchResampleRatesOperator extends Operator {
 
     public final Input<RelaxedRatesPriorSVS> priorInput = new Input<>(
@@ -50,7 +48,7 @@ public class IndicatorSwitchResampleRatesOperator extends Operator {
         prior = priorInput.get();
         indicator = indicatorInput.get();
         rates = ratesInput.get();
-        // Grab the SAME objects used by the prior
+
         tree = prior.treeInput.get();
         rates = prior.ratesInput.get();
         indicator = prior.indicatorInput.get();
@@ -127,7 +125,6 @@ public class IndicatorSwitchResampleRatesOperator extends Operator {
         return logOld - logNew;
     }
 
-    /** Sample i.i.d LogNormal on rates with E[r]=1 (matches prior implementation). */
     private boolean sampleUC() {
         final double s = ucldStdev.getValue();
         if (!(s > 0.0)) return false;
@@ -145,7 +142,6 @@ public class IndicatorSwitchResampleRatesOperator extends Operator {
         return true;
     }
 
-    /** Sample mean-corrected AC increments along the tree (matches prior implementation). */
     private boolean sampleAC() {
         final double s2 = sigma2.getValue();
         if (!(s2 > 0.0)) return false;
@@ -162,7 +158,7 @@ public class IndicatorSwitchResampleRatesOperator extends Operator {
 
             final double dt = child.getLength();
             if (!(dt > minDt)) {
-                // If your trees can have extremely short branches, set minBranchLength very small in the prior.
+
                 return false;
             }
 

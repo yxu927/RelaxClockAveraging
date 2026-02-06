@@ -1,0 +1,40 @@
+data {
+
+  dt   = 1.0/3.0;
+  tmax = 10.0;
+  ages = arange(start=0.0, stop=tmax, step=dt);
+  n    = length(ages);
+  names = rangeInt(start=1, end=n);
+  taxa  = taxa(names=names, ages=ages);
+  nchar = 400;
+}
+
+model {
+      Θ ~ LogNormal(meanlog=1.2, sdlog=0.6);
+      ψ ~ Coalescent(taxa=taxa, theta=Θ);
+
+      gamma ~ LogNormal(meanlog=-1, sdlog=0.7);
+      siteRates ~ DiscretizeGamma(shape=gamma, ncat=4, replicates=nchar);
+
+      clockRate ~ LogNormal(meanlog=-5, sdlog=0.5);
+      sigmaUCLN ~ LogNormal(meanlog=-1.1, sdlog=0.6);
+      rootLogRate = 0.0;
+      σ2 ~ LogNormal(meanlog=-4, sdlog=1.0);
+
+      w_relax = [1.0/2, 1.0/2];
+      i_relax ~ Categorical(p=w_relax);
+
+      rawRates ~ SVSRawBranchRates(tree=ψ,indicator=i_relax,ucldStdev=sigmaUCLN,sigma2=σ2,rootLogRate=rootLogRate);
+      branchRates = SharedRatesClock(tree=ψ, rates=rawRates, meanRate=clockRate, normalize=true);
+
+      w_top = [1.0/3, 2.0/3];
+      i_top ~ Categorical(p=w_top);
+      D_strict ~ PhyloCTMC(L=nchar,Q=jukesCantor(),siteRates = siteRates, mu=clockRate, tree=ψ);
+      D_relaxed ~ PhyloCTMC( L = nchar, Q=jukesCantor(),siteRates = siteRates,tree = ψ, branchRates = branchRates);
+      D ~ MixturePhyloCTMC(comp1=D_strict, comp2=D_relaxed, index=i_top, weights=w_top);
+
+      length = ψ.treeLength();
+      height = ψ.rootAge();
+
+    }
+
