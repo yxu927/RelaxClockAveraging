@@ -44,7 +44,7 @@
 
 
         <provider classname="mixture.beast.evolution.operator.IndicatorSwitchResampleRatesOperator"/>
-
+        <provider classname="mixture.beast.evolution.operator.IndicatorSwitchBridgeHyperOperator"/>
 
 
 
