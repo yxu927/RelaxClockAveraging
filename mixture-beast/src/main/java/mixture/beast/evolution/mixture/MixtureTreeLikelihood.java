@@ -24,7 +24,6 @@ public class MixtureTreeLikelihood extends Distribution {
             "Mixture weights w (dimension K). Usually sum to 1.",
             Validate.REQUIRED);
 
-    // alpha is OPTIONAL: if not set -> behave like pure mixture (alpha=0)
     public final Input<RealParameter> alphaInput = new Input<>(
             "alpha",
             "Coupling exponent alpha (dimension 1). If provided, total logP = logMix + alpha * sum_i logL_i.",

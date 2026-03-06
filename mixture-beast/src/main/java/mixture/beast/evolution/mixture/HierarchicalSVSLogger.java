@@ -35,7 +35,7 @@ public class HierarchicalSVSLogger extends BEASTObject implements Loggable {
             new Input<>("printThreeModelWeights", "print pStrict, pRelaxUC, pRelaxAC", true);
 
     public final Input<Boolean> printRBStatsInput =
-            new Input<>("printRBStats", "print Rao-Blackwell numerator/denominator columns for ucldStdev and sigma2", true);
+            new Input<>("printRBStats", "print Rao-Blackwell numerator/denominator columns for ucldStdev and sigma2", false);
 
     private List<GenericTreeLikelihood> topSubLiks;
     private RealParameter topWeights;

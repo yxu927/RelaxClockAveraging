@@ -11,69 +11,53 @@ import beast.base.inference.parameter.IntegerParameter;
 import beast.base.inference.parameter.RealParameter;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 
 @Description("SVS-style relaxed-clock rate prior on a shared vector of positive branch rates. "
         + "indicator=0: UC i.i.d. LogNormal on rates (E[r]=1). "
-        + "indicator=1: AC lognormal increments along the tree with mean-correction so E[r_child|r_parent]=r_parent. "
-        + "AC is implemented as Normal on log(rates) + Jacobian term for rate-space parameterization.")
+        + "indicator=1: AC lognormal increments along the tree with mean-correction so E[r_child|r_parent]=r_parent.")
+
 public class RelaxedRatesPriorSVS extends Distribution {
 
     public final Input<Tree> treeInput = new Input<>("tree", "tree", Input.Validate.REQUIRED);
 
     public final Input<RealParameter> ratesInput = new Input<>(
-            "rates",
-            "positive branch rates for NON-root nodes; dimension=(tree.nodeCount - 1). "
-                    + "Interpretation: each non-root node holds the rate for the branch leading to that node.",
-            Input.Validate.REQUIRED
-    );
+            "rates", "positive branch rates for NON-root nodes; dimension=(tree.nodeCount - 1).",
+            Input.Validate.REQUIRED);
 
     public final Input<IntegerParameter> indicatorInput = new Input<>(
-            "indicator",
-            "dimension=1; 0=uncorrelated, 1=autocorrelated",
-            Input.Validate.REQUIRED
-    );
+            "indicator", "dimension=1; 0=uncorrelated, 1=autocorrelated",
+            Input.Validate.REQUIRED);
 
-    // UC parameter (lognormal sigma on log scale)
     public final Input<RealParameter> ucldStdevInput = new Input<>(
-            "ucldStdev",
-            "lognormal stdev (sigma on log scale) for UC prior, dimension=1",
-            Input.Validate.REQUIRED
-    );
+            "ucldStdev", "lognormal stdev (sigma on log scale) for UC prior, dimension=1",
+            Input.Validate.REQUIRED);
 
-    // AC parameters
     public final Input<RealParameter> rootLogRateInput = new Input<>(
-            "rootLogRate",
-            "OPTIONAL root log-rate for AC.(relative root rate=1).",
-            Input.Validate.OPTIONAL
-    );
+            "rootLogRate", "OPTIONAL root log-rate for AC (if absent, root log-rate = 0 => root rate = 1).",
+            Input.Validate.OPTIONAL);
 
     public final Input<RealParameter> sigma2Input = new Input<>(
-            "sigma2",
-            "Brownian variance parameter (sigma^2) per unit time for AC prior, dimension=1",
-            Input.Validate.REQUIRED
-    );
+            "sigma2", "Brownian variance parameter (sigma^2) per unit time for AC prior, dimension=1",
+            Input.Validate.REQUIRED);
 
-    // Numerical settings
     public final Input<Double> minBranchLengthInput = new Input<>(
-            "minBranchLength",
-            "minimum branch length (time) allowed in AC; if a branch is shorter, logP=-inf. "
-                    + "Set small (e.g. 1e-12) if you want to allow extremely short branches.",
-            1e-12
-    );
+            "minBranchLength", "minimum branch length (time) allowed in AC; if shorter, logP=-inf.", 1e-12);
+
+
+    private static final double LOG_2PI = Math.log(2.0 * Math.PI);
 
     private Tree tree;
     private RealParameter rates;
     private IntegerParameter indicator;
     private RealParameter ucldStdev;
-    private RealParameter rootLogRate; // optional
+    private RealParameter rootLogRate;
     private RealParameter sigma2;
 
     private int nNodes;
     private int rootNr;
-
-    // nodeNr -> index in rates vector; root -> -1
     private int[] idxMap;
 
     @Override
@@ -106,31 +90,55 @@ public class RelaxedRatesPriorSVS extends Distribution {
                     + rates.getDimension() + " vs " + (nNodes - 1));
         }
 
-        buildIndexMap();
+        buildIndexMapDeterministic();
     }
 
-    private void buildIndexMap() {
+
+    private void buildIndexMapDeterministic() {
         idxMap = new int[nNodes];
         Arrays.fill(idxMap, -2);
 
-        int k = 0;
+        // sanity: collect nodes by nr to ensure 0..nNodes-1 all present exactly once
+        Node[] byNr = new Node[nNodes];
         for (int i = 0; i < nNodes; i++) {
             Node node = tree.getNode(i);
             int nr = node.getNr();
             if (nr < 0 || nr >= nNodes) {
                 throw new IllegalArgumentException("Node nr out of range: " + nr + " (nNodes=" + nNodes + ")");
             }
+            if (byNr[nr] != null) {
+                throw new IllegalStateException("Duplicate node nr encountered: " + nr);
+            }
+            byNr[nr] = node;
+        }
+        for (int nr = 0; nr < nNodes; nr++) {
+            if (byNr[nr] == null) {
+                throw new IllegalStateException("Missing node for nr=" + nr);
+            }
+        }
+
+        int k = 0;
+        for (int nr = 0; nr < nNodes; nr++) {
             if (nr == rootNr) {
                 idxMap[nr] = -1;
             } else {
                 idxMap[nr] = k++;
             }
         }
-
         if (k != nNodes - 1) {
             throw new IllegalStateException("Internal error: expected to map " + (nNodes - 1)
                     + " non-root nodes but mapped " + k);
         }
+    }
+
+    /** log pdf of LogNormal in RATE space: r>0, log(r) ~ Normal(meanLog, var). */
+    private static double logLogNormalRate(final double r, final double meanLog, final double var) {
+        if (!(r > 0.0) || !(var > 0.0)) return Double.NEGATIVE_INFINITY;
+
+        final double x = Math.log(r);     // log(r)
+        final double z = x - meanLog;
+        // log p(r) = log p(x) + log|dx/dr| = log Normal(x; meanLog,var) - log(r)
+        return -x - 0.5 * (LOG_2PI + Math.log(var) + (z * z) / var);
     }
 
     @Override
@@ -147,44 +155,31 @@ public class RelaxedRatesPriorSVS extends Distribution {
         return logP;
     }
 
-    /**
-     * UC: r_i ~ LogNormal(mu, s), i.i.d. in RATE space, with E[r]=1.
-     */
+    /** UC: r_i iid LogNormal with E[r]=1. */
     public double logPriorUCOnly() {
-        final double s = ucldStdev.getValue();
+        final double s = ucldStdev.getValue(0);
         if (!(s > 0.0)) return Double.NEGATIVE_INFINITY;
 
-        final double s2 = s * s;
-        final double mu = -0.5 * s2;
-
-        final double logSqrt2Pi = 0.5 * Math.log(2.0 * Math.PI);
+        final double var = s * s;
+        final double meanLog = -0.5 * var; // ensures E[r]=1
 
         double lp = 0.0;
-
         for (int i = 0; i < rates.getDimension(); i++) {
-            final double r = rates.getValue(i);
-            if (!(r > 0.0)) return Double.NEGATIVE_INFINITY;
-
-            final double x = Math.log(r);
-            final double z = (x - mu);
-
-//log density
-            lp += -x - Math.log(s) - logSqrt2Pi - 0.5 * (z * z) / s2;
+            lp += logLogNormalRate(rates.getValue(i), meanLog, var);
+            if (Double.isInfinite(lp)) return Double.NEGATIVE_INFINITY;
         }
-
         return lp;
     }
 
-
+    /** AC: per-branch lognormal increments with mean-correction (martingale): E[r_child|r_parent]=r_parent. */
     public double logPriorACOnly() {
-        final double s2 = sigma2.getValue();
+        final double s2 = sigma2.getValue(0);
         if (!(s2 > 0.0)) return Double.NEGATIVE_INFINITY;
 
         final double minDt = minBranchLengthInput.get();
         if (!(minDt > 0.0)) return Double.NEGATIVE_INFINITY;
 
-        final double log2Pi = Math.log(2.0 * Math.PI);
-        final double rootLog = (rootLogRate == null ? 0.0 : rootLogRate.getValue());
+        final double rootLog = (rootLogRate == null ? 0.0 : rootLogRate.getValue(0));
 
         double lp = 0.0;
 
@@ -193,10 +188,7 @@ public class RelaxedRatesPriorSVS extends Distribution {
             if (node.isRoot()) continue;
 
             final double dt = node.getLength();
-            if (!(dt > minDt)) {
-
-                return Double.NEGATIVE_INFINITY;
-            }
+            if (!(dt > minDt)) return Double.NEGATIVE_INFINITY;
 
             final double var = s2 * dt;
 
@@ -205,8 +197,6 @@ public class RelaxedRatesPriorSVS extends Distribution {
 
             final double rChi = rates.getValue(idxChi);
             if (!(rChi > 0.0)) return Double.NEGATIVE_INFINITY;
-
-            final double logChi = Math.log(rChi);
 
             final Node parent = node.getParent();
             final double logPar;
@@ -221,16 +211,10 @@ public class RelaxedRatesPriorSVS extends Distribution {
 
                 logPar = Math.log(rPar);
             }
-
-            final double mean = logPar - 0.5 * var;
-            final double z = logChi - mean;
-
-
-            //log density (Normal) and Jacobin(log rate -----rate space)
-
-            lp += -0.5 * (log2Pi + Math.log(var) + (z * z) / var);
-
-            lp += -logChi;
+            // mean-corrected: log(r_child) ~ N(logPar - 0.5*var, var)
+            final double meanLog = logPar - 0.5 * var;
+            lp += logLogNormalRate(rChi, meanLog, var);
+            if (Double.isInfinite(lp)) return Double.NEGATIVE_INFINITY;
         }
 
         return lp;
@@ -238,28 +222,38 @@ public class RelaxedRatesPriorSVS extends Distribution {
 
     @Override
     public List<String> getArguments() {
-        return List.of(rates.getID());
+        return Collections.singletonList(rates.getID());
     }
 
     @Override
     public List<String> getConditions() {
-        // rootLogRate may be null
         if (rootLogRate == null) {
-            return List.of(tree.getID(), indicator.getID(), ucldStdev.getID(), sigma2.getID());
+            return Arrays.asList(tree.getID(), indicator.getID(), ucldStdev.getID(), sigma2.getID());
         }
-        return List.of(tree.getID(), indicator.getID(), ucldStdev.getID(), rootLogRate.getID(), sigma2.getID());
+        return Arrays.asList(tree.getID(), indicator.getID(), ucldStdev.getID(), rootLogRate.getID(), sigma2.getID());
     }
 
     @Override
     public void sample(State state, Random random) {
-        // optional: implement if you need direct sampling; otherwise leave empty
+        // optional
     }
 
     @Override
     protected boolean requiresRecalculation() {
         boolean dirty = false;
 
-        if (tree != null && ((StateNode) tree).somethingIsDirty()) dirty = true;
+        // If tree changed in a way that alters nodeCount/rootNr, rebuild map.
+        if (tree != null && ((StateNode) tree).somethingIsDirty()) {
+            dirty = true;
+            final int newN = tree.getNodeCount();
+            final int newRoot = tree.getRoot().getNr();
+            if (newN != nNodes || newRoot != rootNr) {
+                nNodes = newN;
+                rootNr = newRoot;
+                buildIndexMapDeterministic();
+            }
+        }
+
         if (rates != null && rates.somethingIsDirty()) dirty = true;
         if (indicator != null && indicator.somethingIsDirty()) dirty = true;
         if (ucldStdev != null && ucldStdev.somethingIsDirty()) dirty = true;

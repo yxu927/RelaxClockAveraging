@@ -33,19 +33,26 @@
         <provider classname="mixture.beast.evolution.clockmodel.auto.CategoricalDistribution"/>
         <provider classname="mixture.beast.evolution.mixture.RelaxedRatesPriorSVS"/>
         <provider classname="mixture.beast.evolution.mixture.SharedRatesClockModel"/>
-
+        <provider classname="mixture.beast.evolution.mixture.RelaxedRatesPriorMixtureUCAC"/>
 
         <provider classname="mixture.beast.evolution.operator.AlphaAnnealingOperator"/>
         <provider classname="mixture.beast.evolution.operator.GlobalLogRateShiftOperator"/>
-<!--        <provider classname="mixture.beast.evolution.operator.IndicatorFlipOperator"/>-->
+        <provider classname="mixture.beast.evolution.operator.UCACMixtureStatsLogger"/>
         <provider classname="mixture.beast.evolution.operator.IndicatorGibbsOperator"/>
         <provider classname="mixture.beast.evolution.operator.SubtreeRateScaleOperator"/>
         <provider classname="mixture.beast.evolution.operator.SingleRateScaleOperator"/>
+        <provider classname="mixture.beast.evolution.operator.IndicatorSwitchResampleSubtreeOperator"/>
 
+        <provider classname="mixture.beast.evolution.operator.BoundedSubtreeRateScaleOperator"/>
 
         <provider classname="mixture.beast.evolution.operator.IndicatorSwitchResampleRatesOperator"/>
         <provider classname="mixture.beast.evolution.operator.IndicatorSwitchBridgeHyperOperator"/>
+        <provider classname="mixture.beast.evolution.operator.IndicatorSwitchMomentMatchHyperOperator"/>
 
+
+        <provider classname="mixture.beast.evolution.operator.UCACSwitchBridgeOperator"/>
+        <provider classname="mixture.beast.evolution.operator.UCACSwitchMomentHyperOperator"/>
+        <provider classname="mixture.beast.evolution.operator.ACSubtreeUIncrementOperator"/>
 
 
     </service>

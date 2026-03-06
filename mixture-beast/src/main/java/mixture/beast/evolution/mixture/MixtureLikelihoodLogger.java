@@ -87,7 +87,7 @@ public class MixtureLikelihoodLogger extends BEASTObject implements Loggable {
 
     private static final ThreadLocal<DecimalFormat> DF = ThreadLocal.withInitial(() -> {
         DecimalFormatSymbols sym = DecimalFormatSymbols.getInstance(Locale.US);
-        DecimalFormat df = new DecimalFormat("0.000000", sym);
+        DecimalFormat df = new DecimalFormat("0.000000000", sym);
         df.setGroupingUsed(false);
         return df;
     });
