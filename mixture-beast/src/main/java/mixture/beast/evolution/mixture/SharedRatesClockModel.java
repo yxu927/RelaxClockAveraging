@@ -1,6 +1,5 @@
 package mixture.beast.evolution.mixture;
 
-import beast.base.core.Description;
 import beast.base.core.Input;
 import beast.base.core.Log;
 import beast.base.evolution.branchratemodel.BranchRateModel;
@@ -8,9 +7,7 @@ import beast.base.evolution.tree.Node;
 import beast.base.evolution.tree.Tree;
 import beast.base.inference.StateNode;
 import beast.base.inference.parameter.RealParameter;
-
-import java.util.Arrays;
-
+import mixture.beast.evolution.util.BranchRateIndexHelper;
 
 public class SharedRatesClockModel extends BranchRateModel.Base {
 
@@ -42,13 +39,8 @@ public class SharedRatesClockModel extends BranchRateModel.Base {
     private RealParameter meanRate;
     private boolean doNormalize;
 
-    private int nNodes;
-    private int rootNr;
+    private BranchRateIndexHelper.Mapping mapping;
 
-    // Map nodeNr -> index in rates vector; root -> -1
-    private int[] idxMap;
-
-    // Derived normalization factor (only used if normalize=true)
     private double scaleFactor = 1.0;
     private double storedScaleFactor = 1.0;
 
@@ -67,66 +59,38 @@ public class SharedRatesClockModel extends BranchRateModel.Base {
             throw new IllegalArgumentException("meanRate must have dimension=1.");
         }
 
-        nNodes = tree.getNodeCount();
-        rootNr = tree.getRoot().getNr();
+        BranchRateIndexHelper.validateRatesDimension(tree, rates, "SharedRatesClockModel");
+        mapping = BranchRateIndexHelper.buildDeterministic(tree);
 
-        if (rates.getDimension() != nNodes - 1) {
-            throw new IllegalArgumentException("rates must have dimension (nodeCount - 1). Found "
-                    + rates.getDimension() + " vs " + (nNodes - 1));
-        }
-
-        buildIndexMap();
-
-        // Compute initial scale factor
         if (doNormalize) {
             computeScaleFactor();
         } else {
             scaleFactor = 1.0;
         }
 
-        Log.info.println("SharedRatesClockModel init: nNodes=" + nNodes
+        Log.info.println("SharedRatesClockModel init: nNodes=" + mapping.getNodeCount()
                 + ", normalize=" + doNormalize);
     }
 
-    private void buildIndexMap() {
-        idxMap = new int[nNodes];
-        Arrays.fill(idxMap, -2);
-
-        int k = 0;
-        for (int i = 0; i < nNodes; i++) {
-            Node node = tree.getNode(i);
-            int nr = node.getNr();
-            if (nr < 0 || nr >= nNodes) {
-                throw new IllegalArgumentException("Node nr out of range: " + nr + " (nNodes=" + nNodes + ")");
-            }
-            if (nr == rootNr) {
-                idxMap[nr] = -1;
-            } else {
-                idxMap[nr] = k++;
-            }
-        }
-
-        if (k != nNodes - 1) {
-            throw new IllegalStateException("Internal error: expected to map " + (nNodes - 1)
-                    + " non-root nodes but mapped " + k);
-        }
+    private void ensureMappingUpToDate() {
+        mapping = BranchRateIndexHelper.ensureUpToDate(tree, mapping, rates, "SharedRatesClockModel");
     }
 
     @Override
-    public double getRateForBranch(Node node) {
+    public double getRateForBranch(final Node node) {
         if (node.isRoot()) {
             return 1.0;
         }
+
+        ensureMappingUpToDate();
 
         final double mr = meanRate.getValue();
         if (!(mr > 0.0)) {
             return 0.0;
         }
 
-        final int nr = node.getNr();
-        final int idx = idxMap[nr];
+        final int idx = mapping.idxForNode(node);
         if (idx < 0) {
-
             return 0.0;
         }
 
@@ -139,19 +103,28 @@ public class SharedRatesClockModel extends BranchRateModel.Base {
     }
 
     private void computeScaleFactor() {
+        ensureMappingUpToDate();
+
         double sumRateTime = 0.0;
         double sumTime = 0.0;
 
+        final int nNodes = mapping.getNodeCount();
         for (int i = 0; i < nNodes; i++) {
-            Node node = tree.getNode(i);
-            if (node.isRoot()) continue;
+            final Node node = tree.getNode(i);
+            if (node.isRoot()) {
+                continue;
+            }
 
-            final double dt = node.getLength(); // branch length in time units
-            if (!(dt > 0.0)) continue;
+            final double dt = node.getLength();
+            if (!(dt > 0.0)) {
+                continue;
+            }
 
-            final int idx = idxMap[node.getNr()];
+            final int idx = mapping.idxForNode(node);
             final double r = rates.getValue(idx);
-            if (!(r > 0.0)) continue;
+            if (!(r > 0.0)) {
+                continue;
+            }
 
             sumRateTime += r * dt;
             sumTime += dt;
@@ -170,6 +143,7 @@ public class SharedRatesClockModel extends BranchRateModel.Base {
 
         if (tree != null && ((StateNode) tree).somethingIsDirty()) {
             dirty = true;
+            ensureMappingUpToDate();
         }
         if (rates != null && rates.somethingIsDirty()) {
             dirty = true;
