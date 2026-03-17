@@ -7,9 +7,7 @@ import beast.base.evolution.tree.Tree;
 import beast.base.inference.Operator;
 import beast.base.inference.parameter.IntegerParameter;
 import beast.base.inference.parameter.RealParameter;
-import beast.base.util.Randomizer;
-
-import java.util.Arrays;
+import mixture.beast.evolution.util.BranchRateIndexHelper;
 
 @Description("UC<->AC switch operator that deterministically maps the shared rate vector through "
         + "a latent standard-normal vector u (non-centered bridge). "
@@ -33,9 +31,7 @@ public class UCACSwitchBridgeOperator extends Operator {
     private RealParameter sigma2;
     private RealParameter rootLogRate;
 
-    private int nNodes;
-    private int rootNr;
-    private int[] idxMap; // nodeNr -> ratesIndex, root -> -1
+    private BranchRateIndexHelper.Mapping mapping;
 
     @Override
     public void initAndValidate() {
@@ -46,54 +42,25 @@ public class UCACSwitchBridgeOperator extends Operator {
         sigma2 = sigma2Input.get();
         rootLogRate = rootLogRateInput.get();
 
-        if (indicator.getDimension() != 1) throw new IllegalArgumentException("indicator dimension must be 1");
-        if (ucldStdev.getDimension() != 1) throw new IllegalArgumentException("ucldStdev dimension must be 1");
-        if (sigma2.getDimension() != 1) throw new IllegalArgumentException("sigma2 dimension must be 1");
-        if (rootLogRate != null && rootLogRate.getDimension() != 1) throw new IllegalArgumentException("rootLogRate dimension must be 1");
-
-        nNodes = tree.getNodeCount();
-        rootNr = tree.getRoot().getNr();
-
-        if (rates.getDimension() != nNodes - 1) {
-            throw new IllegalArgumentException("rates must have dimension nodeCount-1");
+        if (indicator.getDimension() != 1) {
+            throw new IllegalArgumentException("indicator dimension must be 1");
+        }
+        if (ucldStdev.getDimension() != 1) {
+            throw new IllegalArgumentException("ucldStdev dimension must be 1");
+        }
+        if (sigma2.getDimension() != 1) {
+            throw new IllegalArgumentException("sigma2 dimension must be 1");
+        }
+        if (rootLogRate != null && rootLogRate.getDimension() != 1) {
+            throw new IllegalArgumentException("rootLogRate dimension must be 1");
         }
 
-        rebuildIdxMap_likeYourPrior();
+        BranchRateIndexHelper.validateRatesDimension(tree, rates, "UCACSwitchBridgeOperator");
+        mapping = BranchRateIndexHelper.buildDeterministic(tree);
     }
 
-    private void rebuildIdxMap_likeYourPrior() {
-        idxMap = new int[nNodes];
-        Arrays.fill(idxMap, -2);
-
-        int k = 0;
-        for (int i = 0; i < nNodes; i++) {
-            Node node = tree.getNode(i);
-            int nr = node.getNr();
-            if (nr < 0 || nr >= nNodes) {
-                throw new IllegalArgumentException("Node nr out of range: " + nr);
-            }
-            if (nr == rootNr) {
-                idxMap[nr] = -1;
-            } else {
-                idxMap[nr] = k++;
-            }
-        }
-        if (k != nNodes - 1) {
-            throw new IllegalStateException("Expected " + (nNodes - 1) + " non-root nodes, got " + k);
-        }
-    }
-
-    private void ensureMapsUpToDate() {
-        int newN = tree.getNodeCount();
-        int newRoot = tree.getRoot().getNr();
-        if (newN != nNodes || newRoot != rootNr) {
-            nNodes = newN;
-            rootNr = newRoot;
-            if (rates.getDimension() != nNodes - 1) {
-                throw new IllegalStateException("rates dimension inconsistent with tree");
-            }
-            rebuildIdxMap_likeYourPrior();
-        }
+    private void ensureMappingUpToDate() {
+        mapping = BranchRateIndexHelper.ensureUpToDate(tree, mapping, rates, "UCACSwitchBridgeOperator");
     }
 
     private double rootLog() {
@@ -106,7 +73,7 @@ public class UCACSwitchBridgeOperator extends Operator {
 
     @Override
     public double proposal() {
-        ensureMapsUpToDate();
+        ensureMappingUpToDate();
 
         final int k = indicator.getValue(0);
         if (k == 0) {
@@ -121,7 +88,9 @@ public class UCACSwitchBridgeOperator extends Operator {
         final double s = ucldStdev.getValue(0);
         final double sig2 = sigma2.getValue(0);
         final double minDt = minBranchLengthInput.get();
-        if (!(s > 0.0) || !(sig2 > 0.0) || !(minDt > 0.0)) return Double.NEGATIVE_INFINITY;
+        if (!(s > 0.0) || !(sig2 > 0.0) || !(minDt > 0.0)) {
+            return Double.NEGATIVE_INFINITY;
+        }
 
         final int nEdges = rates.getDimension();
         final double muUC = -0.5 * s * s;
@@ -131,7 +100,9 @@ public class UCACSwitchBridgeOperator extends Operator {
 
         for (int i = 0; i < nEdges; i++) {
             final double r = rates.getValue(i);
-            if (!(r > 0.0)) return Double.NEGATIVE_INFINITY;
+            if (!(r > 0.0)) {
+                return Double.NEGATIVE_INFINITY;
+            }
             final double x = Math.log(r);
             xOld[i] = x;
             u[i] = (x - muUC) / s;
@@ -146,9 +117,10 @@ public class UCACSwitchBridgeOperator extends Operator {
             return Double.NEGATIVE_INFINITY;
         }
 
-
         double sumDelta = 0.0;
-        for (int i = 0; i < nEdges; i++) sumDelta += (xNew[i] - xOld[i]);
+        for (int i = 0; i < nEdges; i++) {
+            sumDelta += (xNew[i] - xOld[i]);
+        }
         final double logH = sumDelta + 0.5 * sum.sumLogVar - nEdges * Math.log(s);
 
         rates.startEditing(this);
@@ -162,12 +134,13 @@ public class UCACSwitchBridgeOperator extends Operator {
         return logH;
     }
 
-
     private double proposeACtoUC() {
         final double s = ucldStdev.getValue(0);
         final double sig2 = sigma2.getValue(0);
         final double minDt = minBranchLengthInput.get();
-        if (!(s > 0.0) || !(sig2 > 0.0) || !(minDt > 0.0)) return Double.NEGATIVE_INFINITY;
+        if (!(s > 0.0) || !(sig2 > 0.0) || !(minDt > 0.0)) {
+            return Double.NEGATIVE_INFINITY;
+        }
 
         final int nEdges = rates.getDimension();
         final double muUC = -0.5 * s * s;
@@ -175,7 +148,9 @@ public class UCACSwitchBridgeOperator extends Operator {
         final double[] xOld = new double[nEdges];
         for (int i = 0; i < nEdges; i++) {
             final double r = rates.getValue(i);
-            if (!(r > 0.0)) return Double.NEGATIVE_INFINITY;
+            if (!(r > 0.0)) {
+                return Double.NEGATIVE_INFINITY;
+            }
             xOld[i] = Math.log(r);
         }
 
@@ -193,12 +168,12 @@ public class UCACSwitchBridgeOperator extends Operator {
             xNew[i] = muUC + s * u[i];
         }
 
-
         double sumDelta = 0.0;
-        for (int i = 0; i < nEdges; i++) sumDelta += (xNew[i] - xOld[i]);
+        for (int i = 0; i < nEdges; i++) {
+            sumDelta += (xNew[i] - xOld[i]);
+        }
         final double logH = sumDelta + nEdges * Math.log(s) - 0.5 * sum.sumLogVar;
 
-        // Commit
         rates.startEditing(this);
         for (int i = 0; i < nEdges; i++) {
             rates.setValue(i, Math.exp(xNew[i]));
@@ -214,26 +189,33 @@ public class UCACSwitchBridgeOperator extends Operator {
                                    final double logPar,
                                    final double[] u,
                                    final double[] xOut,
-                                   final double sigma2,
+                                   final double sigma2Value,
                                    final double minDt,
                                    final Sum sum) {
         final int cc = parent.getChildCount();
         for (int c = 0; c < cc; c++) {
             final Node child = parent.getChild(c);
-            final int idx = idxMap[child.getNr()];
-            if (idx < 0) throw new ArithmeticException("Bad idxMap for child");
+            final int idx = mapping.idxForNode(child);
+            if (idx < 0) {
+                throw new ArithmeticException("Bad mapping for child");
+            }
 
             final double dt = child.getLength();
-            if (!(dt > minDt)) throw new ArithmeticException("dt too small");
-            final double var = sigma2 * dt;
-            if (!(var > 0.0)) throw new ArithmeticException("var<=0");
+            if (!(dt > minDt)) {
+                throw new ArithmeticException("dt too small");
+            }
+
+            final double var = sigma2Value * dt;
+            if (!(var > 0.0)) {
+                throw new ArithmeticException("var<=0");
+            }
 
             sum.sumLogVar += Math.log(var);
 
             final double logChild = logPar - 0.5 * var + Math.sqrt(var) * u[idx];
             xOut[idx] = logChild;
 
-            fillLogRatesFromU(child, logChild, u, xOut, sigma2, minDt, sum);
+            fillLogRatesFromU(child, logChild, u, xOut, sigma2Value, minDt, sum);
         }
     }
 
@@ -241,26 +223,33 @@ public class UCACSwitchBridgeOperator extends Operator {
                                      final double logPar,
                                      final double[] x,
                                      final double[] uOut,
-                                     final double sigma2,
+                                     final double sigma2Value,
                                      final double minDt,
                                      final Sum sum) {
         final int cc = parent.getChildCount();
         for (int c = 0; c < cc; c++) {
             final Node child = parent.getChild(c);
-            final int idx = idxMap[child.getNr()];
-            if (idx < 0) throw new ArithmeticException("Bad idxMap for child");
+            final int idx = mapping.idxForNode(child);
+            if (idx < 0) {
+                throw new ArithmeticException("Bad mapping for child");
+            }
 
             final double dt = child.getLength();
-            if (!(dt > minDt)) throw new ArithmeticException("dt too small");
-            final double var = sigma2 * dt;
-            if (!(var > 0.0)) throw new ArithmeticException("var<=0");
+            if (!(dt > minDt)) {
+                throw new ArithmeticException("dt too small");
+            }
+
+            final double var = sigma2Value * dt;
+            if (!(var > 0.0)) {
+                throw new ArithmeticException("var<=0");
+            }
 
             sum.sumLogVar += Math.log(var);
 
             final double mean = logPar - 0.5 * var;
             uOut[idx] = (x[idx] - mean) / Math.sqrt(var);
 
-            fillUFromLogRatesAC(child, x[idx], x, uOut, sigma2, minDt, sum);
+            fillUFromLogRatesAC(child, x[idx], x, uOut, sigma2Value, minDt, sum);
         }
     }
 }
