@@ -8,8 +8,7 @@ import beast.base.inference.Operator;
 import beast.base.inference.parameter.IntegerParameter;
 import beast.base.inference.parameter.RealParameter;
 import beast.base.util.Randomizer;
-
-import java.util.Arrays;
+import mixture.beast.evolution.util.BranchRateIndexHelper;
 
 @Description("UC<->AC switch operator that also proposes sigma2 and ucldStdev using fast moment/MLE-like "
         + "estimates from the current shared rates. Helps big trees avoid 'prior mismatch' when switching.")
@@ -39,9 +38,7 @@ public class UCACSwitchMomentHyperOperator extends Operator {
     private RealParameter sigma2;
     private RealParameter rootLogRate;
 
-    private int nNodes;
-    private int rootNr;
-    private int[] idxMap; // nodeNr -> ratesIndex, root -> -1
+    private BranchRateIndexHelper.Mapping mapping;
 
     @Override
     public void initAndValidate() {
@@ -52,52 +49,36 @@ public class UCACSwitchMomentHyperOperator extends Operator {
         sigma2 = sigma2Input.get();
         rootLogRate = rootLogRateInput.get();
 
-        if (indicator.getDimension() != 1) throw new IllegalArgumentException("indicator dimension must be 1");
-        if (ucldStdev.getDimension() != 1) throw new IllegalArgumentException("ucldStdev dimension must be 1");
-        if (sigma2.getDimension() != 1) throw new IllegalArgumentException("sigma2 dimension must be 1");
-        if (rootLogRate != null && rootLogRate.getDimension() != 1) throw new IllegalArgumentException("rootLogRate dimension must be 1");
-
-        nNodes = tree.getNodeCount();
-        rootNr = tree.getRoot().getNr();
-        if (rates.getDimension() != nNodes - 1) {
-            throw new IllegalArgumentException("rates must have dimension nodeCount-1");
+        if (indicator.getDimension() != 1) {
+            throw new IllegalArgumentException("indicator dimension must be 1");
         }
-        rebuildIdxMap_likeYourPrior();
+        if (ucldStdev.getDimension() != 1) {
+            throw new IllegalArgumentException("ucldStdev dimension must be 1");
+        }
+        if (sigma2.getDimension() != 1) {
+            throw new IllegalArgumentException("sigma2 dimension must be 1");
+        }
+        if (rootLogRate != null && rootLogRate.getDimension() != 1) {
+            throw new IllegalArgumentException("rootLogRate dimension must be 1");
+        }
+
+        BranchRateIndexHelper.validateRatesDimension(tree, rates, "UCACSwitchMomentHyperOperator");
+        mapping = BranchRateIndexHelper.buildDeterministic(tree);
     }
 
-    private void rebuildIdxMap_likeYourPrior() {
-        idxMap = new int[nNodes];
-        Arrays.fill(idxMap, -2);
-
-        int k = 0;
-        for (int i = 0; i < nNodes; i++) {
-            Node node = tree.getNode(i);
-            int nr = node.getNr();
-            if (nr < 0 || nr >= nNodes) throw new IllegalArgumentException("Node nr out of range: " + nr);
-            if (nr == rootNr) idxMap[nr] = -1;
-            else idxMap[nr] = k++;
-        }
-        if (k != nNodes - 1) throw new IllegalStateException("Expected " + (nNodes - 1) + " non-root nodes, got " + k);
-    }
-
-    private void ensureMapsUpToDate() {
-        int newN = tree.getNodeCount();
-        int newRoot = tree.getRoot().getNr();
-        if (newN != nNodes || newRoot != rootNr) {
-            nNodes = newN;
-            rootNr = newRoot;
-            if (rates.getDimension() != nNodes - 1) throw new IllegalStateException("rates dimension inconsistent with tree");
-            rebuildIdxMap_likeYourPrior();
-        }
+    private void ensureMappingUpToDate() {
+        mapping = BranchRateIndexHelper.ensureUpToDate(tree, mapping, rates, "UCACSwitchMomentHyperOperator");
     }
 
     private double rootLog() {
         return (rootLogRate == null ? 0.0 : rootLogRate.getValue(0));
     }
 
-
     private static double logLogNormalPdf(final double value, final double meanLog, final double sdLog) {
-        if (!(value > 0.0) || !(sdLog > 0.0)) return Double.NEGATIVE_INFINITY;
+        if (!(value > 0.0) || !(sdLog > 0.0)) {
+            return Double.NEGATIVE_INFINITY;
+        }
+
         final double x = Math.log(value);
         final double z = (x - meanLog) / sdLog;
         return -x - Math.log(sdLog) - LOG_SQRT_2PI - 0.5 * z * z;
@@ -107,14 +88,17 @@ public class UCACSwitchMomentHyperOperator extends Operator {
     private double estimateUCLDStdevFromRates() {
         final int n = rates.getDimension();
         double sumX2 = 0.0;
+
         for (int i = 0; i < n; i++) {
             final double r = rates.getValue(i);
-            if (!(r > 0.0)) return Double.NaN;
+            if (!(r > 0.0)) {
+                return Double.NaN;
+            }
             final double x = Math.log(r);
             sumX2 += x * x;
         }
+
         final double meanX2 = sumX2 / n;
-        // v = s^2 = 2( sqrt(1 + mean(x^2)) - 1 )
         final double vHat = 2.0 * (Math.sqrt(1.0 + meanX2) - 1.0);
         return Math.sqrt(Math.max(vHat, minPositiveInput.get()));
     }
@@ -122,26 +106,37 @@ public class UCACSwitchMomentHyperOperator extends Operator {
     /** Fast estimate of AC sigma2 from increments d = logChi - logPar (MLE-like with mean correction). */
     private double estimateSigma2FromRatesAndTree() {
         final double minDt = minBranchLengthInput.get();
-        if (!(minDt > 0.0)) return Double.NaN;
+        if (!(minDt > 0.0)) {
+            return Double.NaN;
+        }
 
-        double Sdt = 0.0;
-        double S = 0.0;
+        double sumDt = 0.0;
+        double sumScaledSq = 0.0;
         int m = 0;
 
         final double rootLog = rootLog();
+        final int nNodes = mapping.getNodeCount();
 
         for (int i = 0; i < nNodes; i++) {
             final Node node = tree.getNode(i);
-            if (node.isRoot()) continue;
+            if (node.isRoot()) {
+                continue;
+            }
 
             final double dt = node.getLength();
-            if (!(dt > minDt)) return Double.NaN;
+            if (!(dt > minDt)) {
+                return Double.NaN;
+            }
 
-            final int idxChi = idxMap[node.getNr()];
-            if (idxChi < 0) return Double.NaN;
+            final int idxChi = mapping.idxForNode(node);
+            if (idxChi < 0) {
+                return Double.NaN;
+            }
 
             final double rChi = rates.getValue(idxChi);
-            if (!(rChi > 0.0)) return Double.NaN;
+            if (!(rChi > 0.0)) {
+                return Double.NaN;
+            }
             final double logChi = Math.log(rChi);
 
             final Node parent = node.getParent();
@@ -149,48 +144,59 @@ public class UCACSwitchMomentHyperOperator extends Operator {
             if (parent.isRoot()) {
                 logPar = rootLog;
             } else {
-                final int idxPar = idxMap[parent.getNr()];
-                if (idxPar < 0) return Double.NaN;
+                final int idxPar = mapping.idxForNode(parent);
+                if (idxPar < 0) {
+                    return Double.NaN;
+                }
 
                 final double rPar = rates.getValue(idxPar);
-                if (!(rPar > 0.0)) return Double.NaN;
+                if (!(rPar > 0.0)) {
+                    return Double.NaN;
+                }
                 logPar = Math.log(rPar);
             }
 
             final double d = logChi - logPar;
-
-            Sdt += dt;
-            S += (d * d) / dt;
+            sumDt += dt;
+            sumScaledSq += (d * d) / dt;
             m++;
         }
 
-        if (!(Sdt > 0.0) || m <= 0) return Double.NaN;
+        if (!(sumDt > 0.0) || m <= 0) {
+            return Double.NaN;
+        }
 
-        // Solve: 0.25*Sdt*v^2 + m*v - S = 0, v>0
-        final double disc = (double) m * (double) m + Sdt * S;
-        if (!(disc >= 0.0)) return Double.NaN;
+        final double disc = (double) m * (double) m + sumDt * sumScaledSq;
+        if (!(disc >= 0.0)) {
+            return Double.NaN;
+        }
 
-        final double vHat = 2.0 * (-m + Math.sqrt(disc)) / Sdt;
+        final double vHat = 2.0 * (-m + Math.sqrt(disc)) / sumDt;
         return Math.max(vHat, minPositiveInput.get());
     }
 
     @Override
     public double proposal() {
-        ensureMapsUpToDate();
+        ensureMappingUpToDate();
 
         final double ucldCenter = estimateUCLDStdevFromRates();
         final double sigma2Center = estimateSigma2FromRatesAndTree();
-        if (!Double.isFinite(ucldCenter) || !Double.isFinite(sigma2Center)) return Double.NEGATIVE_INFINITY;
+        if (!Double.isFinite(ucldCenter) || !Double.isFinite(sigma2Center)) {
+            return Double.NEGATIVE_INFINITY;
+        }
 
         final double uSd = ucldLogSdInput.get();
         final double s2Sd = sigma2LogSdInput.get();
-        if (!(uSd > 0.0) || !(s2Sd > 0.0)) return Double.NEGATIVE_INFINITY;
+        if (!(uSd > 0.0) || !(s2Sd > 0.0)) {
+            return Double.NEGATIVE_INFINITY;
+        }
 
         final double oldU = ucldStdev.getValue(0);
         final double oldS2 = sigma2.getValue(0);
-        if (!(oldU > 0.0) || !(oldS2 > 0.0)) return Double.NEGATIVE_INFINITY;
+        if (!(oldU > 0.0) || !(oldS2 > 0.0)) {
+            return Double.NEGATIVE_INFINITY;
+        }
 
-        // Propose new hyperparameters around centers (independence sampler)
         final double newU = ucldCenter * Math.exp(uSd * Randomizer.nextGaussian());
         final double newS2 = sigma2Center * Math.exp(s2Sd * Randomizer.nextGaussian());
 
