@@ -54,6 +54,11 @@
         <provider classname="mixture.beast.evolution.operator.UCACSwitchMomentHyperOperator"/>
         <provider classname="mixture.beast.evolution.operator.ACSubtreeUIncrementOperator"/>
 
+        <provider classname="mixture.beast.evolution.operator.ACSigma2NonCenteredOperator"/>
+        <provider classname="mixture.beast.evolution.operator.UCLDStdevNonCenteredOperator"/>
+
+
+
 
     </service>
 </package>
