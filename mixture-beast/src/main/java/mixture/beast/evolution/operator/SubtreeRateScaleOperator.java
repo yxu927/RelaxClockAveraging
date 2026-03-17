@@ -7,9 +7,9 @@ import beast.base.evolution.tree.Tree;
 import beast.base.inference.Operator;
 import beast.base.inference.parameter.RealParameter;
 import beast.base.util.Randomizer;
+import mixture.beast.evolution.util.BranchRateIndexHelper;
 
 import java.util.ArrayDeque;
-import java.util.Arrays;
 
 @Description("Scale (multiply) all rates in a randomly chosen subtree by a common factor exp(eps). "
         + "Useful for mixing when rates are shared and AC prior induces correlations along the tree.")
@@ -31,68 +31,52 @@ public class SubtreeRateScaleOperator extends Operator {
 
     private Tree tree;
     private RealParameter rates;
-
-    private int nNodes;
-    private int rootNr;
-    private int[] idxMap;
+    private BranchRateIndexHelper.Mapping mapping;
 
     @Override
     public void initAndValidate() {
         tree = treeInput.get();
         rates = ratesInput.get();
 
-        nNodes = tree.getNodeCount();
-        rootNr = tree.getRoot().getNr();
-
-        if (rates.getDimension() != nNodes - 1) {
-            throw new IllegalArgumentException("SubtreeRateScaleOperator: rates must have dimension nodeCount-1.");
-        }
-
-        buildIndexMap();
+        BranchRateIndexHelper.validateRatesDimension(tree, rates, "SubtreeRateScaleOperator");
+        mapping = BranchRateIndexHelper.buildDeterministic(tree);
     }
 
-    private void buildIndexMap() {
-        idxMap = new int[nNodes];
-        Arrays.fill(idxMap, -2);
-
-        int k = 0;
-        for (int i = 0; i < nNodes; i++) {
-            Node node = tree.getNode(i);
-            int nr = node.getNr();
-            if (nr == rootNr) {
-                idxMap[nr] = -1;
-            } else {
-                idxMap[nr] = k++;
-            }
-        }
+    private void ensureMappingUpToDate() {
+        mapping = BranchRateIndexHelper.ensureUpToDate(tree, mapping, rates, "SubtreeRateScaleOperator");
     }
 
     @Override
     public double proposal() {
-        final double window = windowInput.get();
-        if (!(window > 0.0)) return Double.NEGATIVE_INFINITY;
+        ensureMappingUpToDate();
 
-        // pick a random non-root node as subtree root
+        final double window = windowInput.get();
+        if (!(window > 0.0)) {
+            return Double.NEGATIVE_INFINITY;
+        }
+
+        final int nNodes = mapping.getNodeCount();
+
         Node subRoot;
         do {
             subRoot = tree.getNode(Randomizer.nextInt(nNodes));
         } while (subRoot.isRoot());
 
-        // log multiplier
         final double eps = (Randomizer.nextDouble() * 2.0 - 1.0) * window;
         final double m = Math.exp(eps);
 
-        // traverse subtree, scale all non-root node rates
         int count = 0;
-        ArrayDeque<Node> stack = new ArrayDeque<>();
+        final ArrayDeque<Node> stack = new ArrayDeque<>();
         stack.push(subRoot);
 
         while (!stack.isEmpty()) {
-            Node node = stack.pop();
+            final Node node = stack.pop();
 
             if (!node.isRoot()) {
-                final int idx = idxMap[node.getNr()];
-                if (idx < 0) return Double.NEGATIVE_INFINITY;
+                final int idx = mapping.idxForNode(node);
+                if (idx < 0) {
+                    return Double.NEGATIVE_INFINITY;
+                }
 
                 final double r = rates.getValue(idx);
                 final double rNew = r * m;
@@ -103,13 +87,12 @@ public class SubtreeRateScaleOperator extends Operator {
                 count++;
             }
 
-            for (int i = 0; i < node.getChildCount(); i++) {
+            final int childCount = node.getChildCount();
+            for (int i = 0; i < childCount; i++) {
                 stack.push(node.getChild(i));
             }
         }
 
-        // Hastings ratio for scaling count dimensions by multiplier m:
-        // logHR = count * log(m) = count * eps
         return count * eps;
     }
 }
