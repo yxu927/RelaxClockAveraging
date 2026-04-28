@@ -141,10 +141,31 @@ public final class BranchRateIndexHelper {
         }
 
         final int expected = tree.getNodeCount() - 1;
-        if (rates.getDimension() != expected) {
-            throw new IllegalArgumentException(ownerName + ": rates must have dimension (nodeCount - 1). Found "
-                    + rates.getDimension() + " vs " + expected);
+        final int observed = rates.getDimension();
+
+        if (expected < 1) {
+            throw new IllegalArgumentException(ownerName + ": tree must contain at least one non-root branch. "
+                    + "Found nodeCount=" + tree.getNodeCount());
         }
+
+        if (observed == expected) {
+            return;
+        }
+
+
+        if (observed == 1) {
+            final double initialValue = rates.getValue(0);
+            rates.setDimension(expected);
+            for (int i = 0; i < expected; i++) {
+                rates.setValue(i, initialValue);
+            }
+            return;
+        }
+
+        throw new IllegalArgumentException(ownerName + ": rates must have dimension (nodeCount - 1). Found "
+                + observed + " vs " + expected
+                + ". If this XML was produced from a BEAUti template, initialise the shared rates "
+                + "as a scalar so they can be expanded automatically.");
     }
 
     public static Mapping ensureUpToDate(final Tree tree,

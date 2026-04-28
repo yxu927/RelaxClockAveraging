@@ -57,6 +57,10 @@
         <provider classname="mixture.beast.evolution.operator.ACSigma2NonCenteredOperator"/>
         <provider classname="mixture.beast.evolution.operator.UCLDStdevNonCenteredOperator"/>
 
+        <provider classname="mixture.beast.evolution.operator.IndicatorCollapsedGibbsOperator"/>
+        <provider classname="mixture.beast.evolution.operator.UCACSwitchLaplaceHyperOperator"/>
+
+        <provider classname="mixture.beast.evolution.operator.UCACSwitchMultiTryOperator"/>
 
 
 
