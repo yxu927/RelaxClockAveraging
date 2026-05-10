@@ -5,7 +5,7 @@ import beast.base.evolution.tree.Tree;
 import beast.base.evolution.tree.TreeInterface;
 import beast.base.inference.StateNode;
 import beast.base.inference.parameter.RealParameter;
-import lphy.base.evolution.continuous.AutoCorrelatedClock;
+import mixture.lphy.evolution.auto.AutoCorrelatedClock;
 import lphy.base.evolution.tree.TimeTree;
 import lphy.core.model.Value;
 import lphybeast.BEASTContext;

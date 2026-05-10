@@ -6,12 +6,13 @@ import beast.base.inference.StateNode;
 import beast.base.inference.parameter.IntegerParameter;
 import beast.base.inference.parameter.RealParameter;
 import lphy.base.evolution.tree.TimeTree;
+import lphy.core.model.RandomVariable;
 import lphy.core.model.Value;
 import lphybeast.BEASTContext;
 import lphybeast.GeneratorToBEAST;
 import mixture.beast.evolution.mixture.RelaxedRatesPriorSVS;
 
-import lphy.base.evolution.continuous.SVSRawBranchRates;
+import mixture.lphy.evolution.auto.SVSRawBranchRates;
 
 import mixture.beast.evolution.operator.IndicatorGibbsOperator;
 import mixture.beast.evolution.operator.IndicatorSwitchResampleRatesOperator;
@@ -39,6 +40,8 @@ public class SVSRawBranchRatesToBEAST implements GeneratorToBEAST<SVSRawBranchRa
 
         @SuppressWarnings("unchecked")
         Value<Double> rootVal = (Value<Double>) dist.getParams().get(SVSRawBranchRates.ROOT_LOG_RATE);
+
+        boolean indicatorIsRandom = indVal instanceof RandomVariable;
 
         TreeInterface beastTree = (TreeInterface) context.getBEASTObject(treeVal);
         Value<?> outVal = context.getOutput(dist);
@@ -84,10 +87,10 @@ public class SVSRawBranchRatesToBEAST implements GeneratorToBEAST<SVSRawBranchRa
         } else {
             indParam = new IntegerParameter();
             indParam.setID("indicator." + dist.getUniqueId());
-            indParam.setInputValue("value", "0");
+            indParam.setInputValue("value", indVal.value() != null ? String.valueOf(indVal.value()) : "0");
             indParam.setInputValue("lower", 0);
             indParam.setInputValue("upper", 1);
-            indParam.setInputValue("estimate", true);
+            indParam.setInputValue("estimate", indicatorIsRandom);
             indParam.initAndValidate();
             context.putBEASTObject(indVal, indParam);
         }
@@ -108,9 +111,6 @@ public class SVSRawBranchRatesToBEAST implements GeneratorToBEAST<SVSRawBranchRa
         prior.setInputValue("sigma2", sigma2);
         prior.setInputValue("rootLogRate", rootLogRate);
 
-        // Optional: if you want to be lenient with tiny branches
-        // prior.setInputValue("minBranchLength", 1e-12);
-
         prior.initAndValidate();
         context.addBEASTObject(prior, dist);
 
@@ -125,7 +125,7 @@ public class SVSRawBranchRatesToBEAST implements GeneratorToBEAST<SVSRawBranchRa
         oneScale.initAndValidate();
         context.addExtraOperator(oneScale);
 
-        // 2) Subtree correlated scale move (very useful for AC)
+        // 2) Subtree correlated scale move
         SubtreeRateScaleOperator subScale = new SubtreeRateScaleOperator();
         subScale.setID("rawRates.subtreeScale." + dist.getUniqueId());
         subScale.setInputValue("tree", beastTree);
@@ -135,30 +135,29 @@ public class SVSRawBranchRatesToBEAST implements GeneratorToBEAST<SVSRawBranchRa
         subScale.initAndValidate();
         context.addExtraOperator(subScale);
 
-        // 3) Gibbs-style indicator update (replaces flip)
-        IndicatorGibbsOperator gibbs = new IndicatorGibbsOperator();
-        gibbs.setID("indicator.gibbs." + dist.getUniqueId());
-        gibbs.setInputValue("indicator", indParam);
-        gibbs.setInputValue("prior", prior);
-        gibbs.setInputValue("pOne", 0.5);   // should match your Categorical prior weights
-        gibbs.setInputValue("weight", 2.0);
-        gibbs.initAndValidate();
-        context.addExtraOperator(gibbs);
+        // 3) Indicator operators only when indicator is a random variable
+        if (indicatorIsRandom) {
+            IndicatorGibbsOperator gibbs = new IndicatorGibbsOperator();
+            gibbs.setID("indicator.gibbs." + dist.getUniqueId());
+            gibbs.setInputValue("indicator", indParam);
+            gibbs.setInputValue("prior", prior);
+            gibbs.setInputValue("pOne", 0.5);
+            gibbs.setInputValue("weight", 2.0);
+            gibbs.initAndValidate();
+            context.addExtraOperator(gibbs);
 
+            IndicatorSwitchResampleRatesOperator switchResampleRates = new IndicatorSwitchResampleRatesOperator();
+            switchResampleRates.setInputValue("prior", prior);
+            switchResampleRates.setInputValue("weight", 2.0);
+            switchResampleRates.setInputValue("indicator", indParam);
+            switchResampleRates.setInputValue("rates", ratesParam);
+            switchResampleRates.initAndValidate();
+            context.addExtraOperator(switchResampleRates);
 
-        IndicatorSwitchResampleRatesOperator switchResampleRates = new IndicatorSwitchResampleRatesOperator();
+            if (indParam instanceof StateNode) context.addSkipOperator((StateNode) indParam);
+        }
 
-        switchResampleRates.setInputValue("prior", prior);
-        switchResampleRates.setInputValue("weight", 2.0);
-        switchResampleRates.setInputValue("indicator", indParam);
-        switchResampleRates.setInputValue("rates", ratesParam);
-        switchResampleRates.initAndValidate();
-        context.addExtraOperator(switchResampleRates);
-
-        // Prevent default operators/loggers for these
         if (ratesParam instanceof StateNode) context.addSkipOperator((StateNode) ratesParam);
-        if (indParam instanceof StateNode) context.addSkipOperator((StateNode) indParam);
-
         context.addSkipLoggable(ratesParam);
 
         return prior;

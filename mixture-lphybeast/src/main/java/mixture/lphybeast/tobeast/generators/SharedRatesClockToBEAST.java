@@ -9,7 +9,7 @@ import lphybeast.BEASTContext;
 import lphybeast.GeneratorToBEAST;
 
 import mixture.beast.evolution.mixture.SharedRatesClockModel;
-import lphy.base.evolution.continuous.SharedRatesClock;
+import mixture.lphy.evolution.auto.SharedRatesClock;
 
 public class SharedRatesClockToBEAST implements GeneratorToBEAST<SharedRatesClock, SharedRatesClockModel> {
 

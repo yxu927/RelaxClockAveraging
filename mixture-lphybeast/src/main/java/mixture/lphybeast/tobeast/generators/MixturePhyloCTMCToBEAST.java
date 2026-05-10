@@ -7,7 +7,7 @@ import beast.base.evolution.likelihood.ThreadedTreeLikelihood;
 import beast.base.inference.Distribution;
 import beast.base.inference.parameter.RealParameter;
 import lphy.base.evolution.likelihood.AbstractPhyloCTMC;
-import lphy.base.evolution.likelihood.MixturePhyloCTMC;
+import mixture.lphy.evolution.auto.MixturePhyloCTMC;
 import lphy.base.evolution.likelihood.PhyloCTMC;
 import lphy.core.model.Generator;
 import lphy.core.model.Value;
@@ -18,8 +18,8 @@ import mixture.beast.evolution.mixture.HierarchicalSVSLogger;
 import mixture.beast.evolution.mixture.MixtureLikelihoodLogger;
 import mixture.beast.evolution.mixture.MixtureTreeLikelihood;
 import mixture.beast.evolution.mixture.RelaxedRatesPriorSVS;
-import lphy.base.evolution.continuous.SVSRawBranchRates;
-import mutablealignment.MATreeLikelihood;
+import mixture.lphy.evolution.auto.SVSRawBranchRates;
+
 
 import java.util.*;
 
@@ -76,7 +76,7 @@ public class MixturePhyloCTMCToBEAST implements GeneratorToBEAST<MixturePhyloCTM
                 tl = new ThreadedTreeLikelihood();
                 tl.setInputValue("useAmbiguities", true);
             } else {
-                tl = new MATreeLikelihood();
+                tl = new ThreadedTreeLikelihood();
                 tl.setInputValue("useAmbiguities", false);
             }
 

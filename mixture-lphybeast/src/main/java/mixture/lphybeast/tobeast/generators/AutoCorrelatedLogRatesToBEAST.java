@@ -5,7 +5,7 @@ import beast.base.evolution.tree.TreeInterface;
 import beast.base.inference.StateNode;
 import beast.base.inference.operator.kernel.BactrianRandomWalkOperator;
 import beast.base.inference.parameter.RealParameter;
-import lphy.base.evolution.continuous.AutoCorrelatedLogRates;
+import mixture.lphy.evolution.auto.AutoCorrelatedLogRates;
 import lphybeast.BEASTContext;
 import lphybeast.GeneratorToBEAST;
 import mixture.beast.evolution.clockmodel.auto.AutoCorrelatedPrior;

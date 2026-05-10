@@ -6,26 +6,34 @@ import mixture.lphy.evolution.auto.MixturePhyloCTMC;
 
 import javax.swing.*;
 
-public class MixtureModelViewer implements Viewer{
-    public MixtureModelViewer(){}
+public class MixtureModelViewer implements Viewer {
+
+    public MixtureModelViewer() {}
 
     @Override
     public boolean match(Object value) {
-        return value instanceof MixturePhyloCTMC ||
-                (value instanceof Value && ((Value) value).value() instanceof MixturePhyloCTMC);
-
+        Object obj = unwrap(value);
+        return obj instanceof MixturePhyloCTMC;
     }
 
     @Override
     public JComponent getViewer(Object value) {
-        if (match(value)) {
-            return new JTextArea(value.toString());
+        Object obj = unwrap(value);
+        if (obj instanceof MixturePhyloCTMC) {
+            return new JTextArea(obj.toString());
         }
-        String text = ((Value<MixturePhyloCTMC>) value).value().toString();
-        return new JTextArea(text);
+        return new JTextArea("");
+    }
+
+    private Object unwrap(Object value) {
+        if (value instanceof Value<?>) {
+            return ((Value<?>) value).value();
+        }
+        return value;
     }
 
     @Override
-    public String toString() { return "Read Count Viewer"; }
+    public String toString() {
+        return "Mixture Model Viewer";
+    }
 }
-

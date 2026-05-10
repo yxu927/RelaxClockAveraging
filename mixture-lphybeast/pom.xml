@@ -1,6 +1,6 @@
-
 <project>
     <modelVersion>4.0.0</modelVersion>
+
     <parent>
         <groupId>io.github.yxu927</groupId>
         <artifactId>RelaxClockAveraging</artifactId>
@@ -9,7 +9,6 @@
     </parent>
 
     <artifactId>mixture-lphybeast</artifactId>
-
     <version>0.1.0</version>
 
     <dependencies>
@@ -24,39 +23,17 @@
             <artifactId>mixture-beast</artifactId>
             <version>${project.version}</version>
         </dependency>
+
         <dependency>
             <groupId>io.github.yxu927</groupId>
             <artifactId>mixture-lphy</artifactId>
             <version>${project.version}</version>
         </dependency>
+
         <dependency>
             <groupId>io.github.linguaphylo</groupId>
             <artifactId>lphybeast</artifactId>
-            <version>1.7.0</version>
-            <scope>compile</scope>
-        </dependency>
-        <dependency>
-            <groupId>io.github.linguaphylo</groupId>
-            <artifactId>lphybeast</artifactId>
-            <version>1.7.0</version>
-            <scope>compile</scope>
-        </dependency>
-        <dependency>
-            <groupId>io.github.linguaphylo</groupId>
-            <artifactId>jebl</artifactId>
-            <version>3.1.1</version>
-            <scope>compile</scope>
-        </dependency>
-        <dependency>
-            <groupId>io.github.linguaphylo</groupId>
-            <artifactId>lphy-base</artifactId>
-            <version>1.7.0</version>
-            <scope>compile</scope>
-        </dependency>
-        <dependency>
-            <groupId>io.github.linguaphylo</groupId>
-            <artifactId>lphybeast</artifactId>
-            <version>1.7.0</version>
+            <version>${lphybeast.version}</version>
             <scope>compile</scope>
         </dependency>
     </dependencies>
@@ -69,7 +46,7 @@
                 <version>3.7.1</version>
                 <configuration>
                     <descriptors>
-                        <descriptor>../mixture-lphybeast/src/assembly/mixture-lphybeast-assembly.xml</descriptor>
+                        <descriptor>src/assembly/mixture-lphybeast-assembly.xml</descriptor>
                     </descriptors>
                     <outputDirectory>${project.build.directory}</outputDirectory>
                     <appendAssemblyId>false</appendAssemblyId>
@@ -77,8 +54,8 @@
                 </configuration>
                 <executions>
                     <execution>
-                        <id>make-assembly</id> <!-- this is used for inheritance merges -->
-                        <phase>package</phase> <!-- bind to the packaging phase -->
+                        <id>make-assembly</id>
+                        <phase>package</phase>
                         <goals>
                             <goal>single</goal>
                         </goals>
@@ -87,5 +64,4 @@
             </plugin>
         </plugins>
     </build>
-
 </project>

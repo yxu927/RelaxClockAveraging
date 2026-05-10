@@ -1,5 +1,6 @@
 <project>
     <modelVersion>4.0.0</modelVersion>
+
     <parent>
         <groupId>io.github.yxu927</groupId>
         <artifactId>RelaxClockAveraging</artifactId>
@@ -7,7 +8,7 @@
         <relativePath>../pom.xml</relativePath>
     </parent>
 
-    <artifactId>mixtue-lphy-studio</artifactId>
+    <artifactId>mixture-lphy-studio</artifactId>
     <version>0.1.0</version>
 
     <dependencies>
@@ -40,8 +41,8 @@
                 </configuration>
                 <executions>
                     <execution>
-                        <id>make-assembly</id> <!-- this is used for inheritance merges -->
-                        <phase>package</phase> <!-- bind to the packaging phase -->
+                        <id>make-assembly</id>
+                        <phase>package</phase>
                         <goals>
                             <goal>single</goal>
                         </goals>
