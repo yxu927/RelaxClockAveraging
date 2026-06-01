@@ -2,7 +2,7 @@
 
     <depends on='mixture' atleast='0.1.0'/>
     <depends on='lphybeast' atleast='1.3.0'/>
-    <depends on='lphybeast-flc' atleast='0.0.1'/>
+    <depends on='lphybeast.flc' atleast='0.0.1'/>
 
     <service type="lphybeast.spi.LPhyBEASTExt">
         <provider classname="mixture.lphybeast.spi.LBMixture"/>
