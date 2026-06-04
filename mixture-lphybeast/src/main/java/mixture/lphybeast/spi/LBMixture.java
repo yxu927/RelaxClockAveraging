@@ -36,8 +36,8 @@ public class LBMixture implements LPhyBEASTExt {
     @Override
     public List<Class<? extends GeneratorToBEAST>> getGeneratorToBEASTs() {
         return Arrays.asList(
-                AutoCorrelatedClockToBEAST.class, AutoCorrelatedLogRatesToBEAST.class,
-              MixturePhyloCTMCToBEAST.class,
+
+                MixturePhyloCTMCToBEAST.class,
                 CategoricalToBEAST.class,SharedRatesClockToBEAST.class,SVSRawBranchRatesToBEAST.class
         );
     }

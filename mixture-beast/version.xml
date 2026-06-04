@@ -22,18 +22,14 @@
     <service type="beast.base.core.BEASTInterface">
 
         <provider classname="beast.base.evolution.branchratemodel.RandomLocalClockModel"/>
-        <provider classname="beast.base.evolution.branchratemodel.StrictClockModel"/>
-        <provider classname="beast.base.evolution.branchratemodel.UCRelaxedClockModel"/>
-        <provider classname="mixture.beast.evolution.clockmodel.auto.AutoCorrelatedClockModel"/>
-        <provider classname="mixture.beast.evolution.clockmodel.auto.AutoCorrelatedPrior"/>
-        <provider classname="mixture.beast.evolution.clockmodel.auto.MeanZCalculator"/>
+
         <provider classname="mixture.beast.evolution.mixture.MixtureTreeLikelihood"/>
         <provider classname="mixture.beast.evolution.mixture.MixtureLikelihoodLogger"/>
         <provider classname="mixture.beast.evolution.mixture.HierarchicalSVSLogger"/>
-        <provider classname="mixture.beast.evolution.clockmodel.auto.CategoricalDistribution"/>
+        <provider classname="mixture.beast.evolution.mixture.CategoricalDistribution"/>
         <provider classname="mixture.beast.evolution.mixture.RelaxedRatesPriorSVS"/>
         <provider classname="mixture.beast.evolution.mixture.SharedRatesClockModel"/>
-        <provider classname="mixture.beast.evolution.mixture.RelaxedRatesPriorMixtureUCAC"/>
+
 
         <provider classname="mixture.beast.evolution.operator.AlphaAnnealingOperator"/>
         <provider classname="mixture.beast.evolution.operator.GlobalLogRateShiftOperator"/>

@@ -134,9 +134,7 @@ public final class MixturePhyloCTMC implements GenerativeDistribution<Alignment>
             throw new IllegalArgumentException("All components must reference the *same* TimeTree instance.");
         }
 
-        // Do NOT call index.value() here (may be null before sampling).
-        // Do NOT require weights.value() to be non-null here (some pipelines materialize later).
-        // We'll validate weights at sampling time.
+
     }
 
     @GeneratorInfo(

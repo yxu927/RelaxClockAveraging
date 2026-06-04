@@ -20,13 +20,13 @@ public class MixtureImpl extends LPhyBaseImpl {
      * Required by ServiceLoader.
      */
     public MixtureImpl() {
-        //TODO print package or classes info here?
+
     }
 
     @Override
     public List<Class<? extends GenerativeDistribution>> declareDistributions() {
         return Arrays.asList(
-                AutoCorrelatedLogRates.class, MixturePhyloCTMC.class, SVSRawBranchRates.class
+              MixturePhyloCTMC.class, SVSRawBranchRates.class
 
         );
     }
@@ -34,8 +34,7 @@ public class MixtureImpl extends LPhyBaseImpl {
     @Override
     public List<Class<? extends BasicFunction>> declareFunctions() {
         return Arrays.asList(
-                AutoCorrelatedClock.class, SharedRatesClock.class,ChooseAlignment.class
-
+               SharedRatesClock.class
 
         );
     }

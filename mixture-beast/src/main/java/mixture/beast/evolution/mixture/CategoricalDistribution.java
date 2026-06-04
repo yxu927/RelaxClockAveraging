@@ -1,4 +1,4 @@
-package mixture.beast.evolution.clockmodel.auto;
+package mixture.beast.evolution.mixture;
 
 import beast.base.core.Description;
 import beast.base.core.Input;

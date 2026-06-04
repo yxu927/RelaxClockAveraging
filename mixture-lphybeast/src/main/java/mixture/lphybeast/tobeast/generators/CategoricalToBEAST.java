@@ -7,7 +7,7 @@ import lphy.base.distribution.DistributionConstants;
 import lphy.core.model.Value;
 import lphybeast.BEASTContext;
 import lphybeast.GeneratorToBEAST;
-import mixture.beast.evolution.clockmodel.auto.CategoricalDistribution;
+import mixture.beast.evolution.mixture.CategoricalDistribution;
 
 public class CategoricalToBEAST implements GeneratorToBEAST<Categorical, CategoricalDistribution> {
 
