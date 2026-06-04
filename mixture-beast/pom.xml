@@ -86,7 +86,6 @@
                 </executions>
             </plugin>
 
-            <!-- 可选：本地冒烟跑（注意你的路径含空格，exec 可能要另走 bin/beast，见下文）-->
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>
