@@ -73,7 +73,7 @@ spec="Alignment">
     <run id="MCMC" spec="MCMC" chainLength="200000000" preBurnin="960">
         <state id="State" spec="State">
             <parameter id="clockRate" spec="parameter.RealParameter" lower="0.0" name="stateNode">0.005081125542621634</parameter>
-            <parameter id="gamma" spec="parameter.RealParameter" lower="0.0" name="stateNode">0.8242852330864255</parameter>
+            <parameter id="gamma" spec="beast.base.spec.inference.parameter.RealScalarParam" domain="PositiveReal" value="0.8242852330864255" name="stateNode"/>
             <parameter id="Theta" spec="parameter.RealParameter" lower="0.0" name="stateNode">3.7297549923487843</parameter>
             <stateNode id="psi" spec="beast.base.evolution.tree.TreeParser" IsLabelledNewick="true" newick="(((((20:0.3483550034771099,21:0.015021670143776866):2.584531154430718,(((((18:2.128272272065538,22:0.7949389387322059):0.20706492114325314,25:0.0020038598754599235):0.025579498828738778,(24:0.33257507349699633,(((16:0.016927343271063933,((6:1.6518769470799328,10:0.31854361374659934):1.3607454866523243,14:0.3459557670655906):0.3376382428721394):0.9086568737843015,15:1.2589175503886985):0.3637536791996787,17:0.9560045629217111):1.7099038439086165):0.028341618540535407):0.35843584450172017,26:0.052685869872584945):0.6425424334667262,(23:0.7523040918832518,(((((12:0.1687508504942663,(3:2.2009996380660617,8:0.5343329713993952):0.967751212428205):0.38659778757378405,13:0.2220153047347173):0.18369157850126516,(11:0.3486834724710124,(4:2.0374405540731537,(2:1.031166470809996,1:1.3644998041433292):1.6729407499298246):0.6445762517311922):0.7236900774316366):0.9661691764239686,(9:1.023607006196226,(5:1.7742437211064443,7:1.1075770544397778):0.5826966184231148):1.6816023867970586):0.8410777244343084,19:0.21295378409426124):1.8726836411223227):0.9429242114560594):0.23765785456851773):0.3350817341155654,29:0.26796789202339255):0.3866495911412162,27:1.3212841498312766):4.164671552891379,(30:2.2464448337535963,(28:1.0597274133964873,31:0.059727413396485574):1.8533840870237768):2.2395108689690577):0.0;">
                 <trait id="TraitSet" spec="beast.base.evolution.tree.TraitSet" traitname="date-backward">
@@ -205,11 +205,9 @@ spec="Alignment">
                 <distribution id="CategoricalDistribution" spec="mixture.beast.evolution.mixture.CategoricalDistribution" parameter="@i_relax">
                     <parameter id="w_relax" spec="parameter.RealParameter" dimension="2" estimate="false" name="p">0.5 0.5</parameter>
                 </distribution>
-                <distribution id="gamma.prior" spec="distribution.Prior" x="@gamma">
-                    <distr id="LogNormalDistributionModel3" spec="distribution.LogNormalDistributionModel">
-                        <parameter id="RealParameter6" spec="parameter.RealParameter" name="M">-1.0</parameter>
-                        <parameter id="RealParameter7" spec="parameter.RealParameter" name="S">0.7</parameter>
-                    </distr>
+                <distribution id="gamma.prior" spec="beast.base.spec.inference.distribution.LogNormal" param="@gamma">
+                    <M spec="beast.base.spec.inference.parameter.RealScalarParam" domain="Real" value="-1.0" estimate="false"/>
+                    <S spec="beast.base.spec.inference.parameter.RealScalarParam" domain="PositiveReal" value="0.7" estimate="false"/>
                 </distribution>
                 <distribution id="clockRate.prior" spec="distribution.Prior" x="@clockRate">
                     <distr id="LogNormalDistributionModel4" spec="distribution.LogNormalDistributionModel">
@@ -226,13 +224,13 @@ spec="Alignment">
                 <distribution id="D.mixtureTreeLikelihood" spec="mixture.beast.evolution.mixture.MixtureTreeLikelihood">
                     <subLikelihood id="D.treeLikelihood.component0" spec="ThreadedTreeLikelihood" tree="@psi" useAmbiguities="true">
                         <data idref="D"/>
-                        <siteModel id="SiteModel" spec="SiteModel" gammaCategoryCount="4" shape="@gamma">
+                        <siteModel id="SiteModel" spec="beast.base.spec.evolution.sitemodel.SiteModel" gammaCategoryCount="4" shape="@gamma">
                             <substModel id="JukesCantor" spec="JukesCantor"/>
                         </siteModel>
                         <branchRateModel id="StrictClockModel" spec="beast.base.evolution.branchratemodel.StrictClockModel" clock.rate="@clockRate"/>
                     </subLikelihood>
                     <subLikelihood id="D.treeLikelihood.component1" spec="ThreadedTreeLikelihood" data="@D" tree="@psi" useAmbiguities="true">
-                        <siteModel id="SiteModel1" spec="SiteModel" gammaCategoryCount="4" shape="@gamma">
+                        <siteModel id="SiteModel1" spec="beast.base.spec.evolution.sitemodel.SiteModel" gammaCategoryCount="4" shape="@gamma">
                             <substModel id="JukesCantor1" spec="JukesCantor"/>
                         </siteModel>
                         <branchRateModel id="SharedRatesClockModel.1520387953" spec="mixture.beast.evolution.mixture.SharedRatesClockModel" meanRate="@clockRate" normalize="true" rates="@rawRates.554868511" tree="@psi"/>
@@ -247,7 +245,7 @@ spec="Alignment">
             <up idref="clockRate"/>
             <down idref="psi"/>
         </operator>
-        <operator id="gamma.scale" spec="kernel.BactrianScaleOperator" parameter="@gamma" upper="10.0" weight="1.0"/>
+        <operator id="gamma.scale" spec="beast.base.spec.inference.operator.ScaleOperator" parameter="@gamma" scaleFactor="0.75" upper="10.0" weight="1.0"/>
         <operator id="indicator.gibbs.554868511" spec="mixture.beast.evolution.operator.IndicatorGibbsOperator" indicator="@i_relax" prior="@SVSRelaxedClockPrior.554868511" weight="2.0"/>
         <operator id="psi.BICEPSEpochAll" spec="EpochFlexOperator" fromOldestTipOnly="false" scaleFactor="0.1" tree="@psi" weight="1.624504792712471"/>
         <operator id="psi.BICEPSEpochTop" spec="EpochFlexOperator" scaleFactor="0.1" tree="@psi" weight="1.0"/>
