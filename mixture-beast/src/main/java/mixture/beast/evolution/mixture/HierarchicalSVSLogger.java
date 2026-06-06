@@ -6,6 +6,8 @@ import beast.base.core.Input.Validate;
 import beast.base.core.Loggable;
 import beast.base.evolution.likelihood.GenericTreeLikelihood;
 import beast.base.inference.parameter.RealParameter;
+import beast.base.spec.type.RealScalar;
+import beast.base.spec.type.RealVector;
 
 import java.io.PrintStream;
 import java.text.DecimalFormat;
@@ -25,6 +27,11 @@ public class HierarchicalSVSLogger extends BEASTObject implements Loggable {
     public final Input<RealParameter> innerWeightsInput =
             new Input<>("innerWeights", "Inner weights for UC vs AC (dim=2). Default is 0.5 0.5.", (RealParameter) null);
 
+    public final Input<RealVector> innerWeightsVectorInput =
+            new Input<>("innerWeightsVector",
+                    "BEAST3 typed inner weights for UC vs AC (dim=2). If absent, defaults to 0.5 0.5.",
+                    Validate.OPTIONAL);
+
     public final Input<Boolean> printTopInput =
             new Input<>("printTop", "print top-level rStrict/rRelax and top weights/logL", false);
 
@@ -38,8 +45,10 @@ public class HierarchicalSVSLogger extends BEASTObject implements Loggable {
             new Input<>("printRBStats", "print Rao-Blackwell numerator/denominator columns for ucldStdev and sigma2", false);
 
     private List<GenericTreeLikelihood> topSubLiks;
-    private RealParameter topWeights;
-    private RealParameter innerWeights;
+    private RealParameter legacyTopWeights;
+    private RealVector typedTopWeights;
+    private RealParameter legacyInnerWeights;
+    private RealVector typedInnerWeights;
     private RelaxedRatesPriorSVS svs;
 
     private boolean printTop;
@@ -58,22 +67,30 @@ public class HierarchicalSVSLogger extends BEASTObject implements Loggable {
     public void initAndValidate() {
         MixtureTreeLikelihood top = topMixtureInput.get();
         this.topSubLiks = new ArrayList<>(top.subLikelihoodsInput.get());
-        this.topWeights = top.weightsInput.get();
+        this.legacyTopWeights = top.weightsInput.get();
+        this.typedTopWeights = top.weightsVectorInput.get();
 
         if (topSubLiks.size() != 2) {
             throw new IllegalArgumentException(getClass().getSimpleName() + ": currently expects K=2 at the top level.");
         }
-        if (topWeights.getDimension() != 2) {
+        if (legacyTopWeights == null && typedTopWeights == null) {
+            throw new IllegalArgumentException("HierarchicalSVSLogger: top mixture must provide weights or weightsVector.");
+        }
+        if (legacyTopWeights != null && typedTopWeights != null) {
+            throw new IllegalArgumentException("HierarchicalSVSLogger: top mixture specifies both weights and weightsVector.");
+        }
+        if (topWeightsDimension() != 2) {
             throw new IllegalArgumentException(getClass().getSimpleName() + ": top weights must have dimension 2.");
         }
 
         this.svs = svsPriorInput.get();
 
-        this.innerWeights = innerWeightsInput.get();
-        if (innerWeights == null) {
-            innerWeights = new RealParameter("0.5 0.5");
+        this.legacyInnerWeights = innerWeightsInput.get();
+        this.typedInnerWeights = innerWeightsVectorInput.get();
+        if (legacyInnerWeights != null && typedInnerWeights != null) {
+            throw new IllegalArgumentException("HierarchicalSVSLogger: specify only one of innerWeights or innerWeightsVector.");
         }
-        if (innerWeights.getDimension() != 2) {
+        if (innerWeightsDimension() != 2) {
             throw new IllegalArgumentException(getClass().getSimpleName() + ": innerWeights must have dimension 2.");
         }
 
@@ -123,8 +140,8 @@ public class HierarchicalSVSLogger extends BEASTObject implements Loggable {
 
     @Override
     public void log(final long sample, final PrintStream out) {
-        final double wStrict = topWeights.getArrayValue(0);
-        final double wRelax = topWeights.getArrayValue(1);
+        final double wStrict = topWeightValue(0);
+        final double wRelax = topWeightValue(1);
 
         final double logLStrict = topSubLiks.get(0).calculateLogP();
         final double logLRelax = topSubLiks.get(1).calculateLogP();
@@ -138,8 +155,8 @@ public class HierarchicalSVSLogger extends BEASTObject implements Loggable {
         final double rStrict = (denom > 0.0 && Double.isFinite(sStrict)) ? (Math.exp(sStrict - m) / denom) : Double.NaN;
         final double rRelaxed = (Double.isFinite(rStrict)) ? (1.0 - rStrict) : Double.NaN;
 
-        final double wu = innerWeights.getArrayValue(0);
-        final double wa = innerWeights.getArrayValue(1);
+        final double wu = innerWeightValue(0);
+        final double wa = innerWeightValue(1);
 
         final double logPUC = svs.logPriorUCOnly();
         final double logPAC = svs.logPriorACOnly();
@@ -153,9 +170,8 @@ public class HierarchicalSVSLogger extends BEASTObject implements Loggable {
         final double rUC = (denom2 > 0.0 && Double.isFinite(tUC)) ? (Math.exp(tUC - mm) / denom2) : Double.NaN;
         final double rAC = (Double.isFinite(rUC)) ? (1.0 - rUC) : Double.NaN;
 
-        final int indicator = svs.indicatorInput.get().getValue(0);
-        final double ucldStdev = svs.ucldStdevInput.get().getValue();
-        final double sigma2 = svs.sigma2Input.get().getValue();
+        final double ucldStdev = svsUcldStdevValue();
+        final double sigma2 = svsSigma2Value();
 
         final double pStrict = rStrict;
         final double pRelaxUC = (Double.isFinite(rRelaxed) && Double.isFinite(rUC)) ? (rRelaxed * rUC) : Double.NaN;
@@ -206,6 +222,62 @@ public class HierarchicalSVSLogger extends BEASTObject implements Loggable {
 
     @Override
     public void close(final PrintStream out) { }
+
+    private int topWeightsDimension() {
+        return legacyTopWeights != null ? legacyTopWeights.getDimension() : typedTopWeights.size();
+    }
+
+    private double topWeightValue(final int k) {
+        return legacyTopWeights != null ? legacyTopWeights.getArrayValue(k) : typedTopWeights.get(k);
+    }
+
+    private boolean hasExplicitInnerWeights() {
+        return legacyInnerWeights != null || typedInnerWeights != null;
+    }
+
+    private int innerWeightsDimension() {
+        if (legacyInnerWeights != null) {
+            return legacyInnerWeights.getDimension();
+        }
+        if (typedInnerWeights != null) {
+            return typedInnerWeights.size();
+        }
+        return 2;
+    }
+
+    private double innerWeightValue(final int k) {
+        if (legacyInnerWeights != null) {
+            return legacyInnerWeights.getArrayValue(k);
+        }
+        if (typedInnerWeights != null) {
+            return typedInnerWeights.get(k);
+        }
+        return 0.5;
+    }
+
+    private double svsUcldStdevValue() {
+        final RealParameter legacy = svs.ucldStdevInput.get();
+        if (legacy != null) {
+            return legacy.getArrayValue(0);
+        }
+        final RealScalar typed = svs.ucldStdevScalarInput.get();
+        if (typed != null) {
+            return typed.get();
+        }
+        return Double.NaN;
+    }
+
+    private double svsSigma2Value() {
+        final RealParameter legacy = svs.sigma2Input.get();
+        if (legacy != null) {
+            return legacy.getArrayValue(0);
+        }
+        final RealScalar typed = svs.sigma2ScalarInput.get();
+        if (typed != null) {
+            return typed.get();
+        }
+        return Double.NaN;
+    }
 
     private static String fmt(final double x) {
         if (Double.isNaN(x)) return "NaN";
