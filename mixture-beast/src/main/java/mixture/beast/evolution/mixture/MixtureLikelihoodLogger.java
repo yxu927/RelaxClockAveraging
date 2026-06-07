@@ -4,7 +4,7 @@ import beast.base.core.BEASTObject;
 import beast.base.core.Input;
 import beast.base.core.Input.Validate;
 import beast.base.core.Loggable;
-import beast.base.evolution.likelihood.GenericTreeLikelihood;
+import beast.base.inference.Distribution;
 import beast.base.inference.parameter.RealParameter;
 import beast.base.spec.type.RealScalar;
 import beast.base.spec.type.RealVector;
@@ -64,7 +64,7 @@ public class MixtureLikelihoodLogger extends BEASTObject implements Loggable {
             new Input<>("printViolationFlag", "print 1 if logMix > maxLogL + 1e-10, else 0", false);
 
     private int K;
-    private List<GenericTreeLikelihood> subLiks;
+    private List<Distribution> subLiks;
     private RealParameter legacyWeights;
     private RealVector typedWeights;
     private RealParameter legacyAlpha;

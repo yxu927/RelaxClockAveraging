@@ -7,7 +7,6 @@ import java.util.Random;
 import beast.base.core.Input;
 import beast.base.core.Input.Validate;
 import beast.base.core.Log;
-import beast.base.evolution.likelihood.GenericTreeLikelihood;
 import beast.base.inference.Distribution;
 import beast.base.inference.State;
 import beast.base.inference.parameter.RealParameter;
@@ -16,9 +15,9 @@ import beast.base.spec.type.RealVector;
 
 public class MixtureTreeLikelihood extends Distribution {
 
-    public final Input<List<GenericTreeLikelihood>> subLikelihoodsInput = new Input<>(
+    public final Input<List<Distribution>> subLikelihoodsInput = new Input<>(
             "subLikelihood",
-            "Component likelihoods L_i = P(D|T,theta_i). Each can be TreeLikelihood or CompoundDistribution.",
+            "Component likelihoods L_i = P(D|T,theta_i). Each can be TreeLikelihood, ThreadedTreeLikelihood, or CompoundDistribution.",
             new ArrayList<>());
 
     public final Input<RealParameter> weightsInput = new Input<>(
@@ -41,7 +40,7 @@ public class MixtureTreeLikelihood extends Distribution {
             "BEAST3 typed coupling exponent alpha. If provided, total logP = logMix + alpha * sum_i logL_i.",
             Validate.OPTIONAL);
 
-    private List<GenericTreeLikelihood> subLikelihoods;
+    private List<Distribution> subLikelihoods;
     private RealParameter legacyWeights;
     private RealVector typedWeights;
     private RealParameter legacyAlpha;

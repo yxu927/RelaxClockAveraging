@@ -233,7 +233,7 @@
 
             <!-- Strict component tree likelihood -->
             <distribution id="treeLikelihoodStrictSVSMix.$(n)"
-                spec="ThreadedTreeLikelihood"
+                spec="beast.base.evolution.likelihood.ThreadedTreeLikelihood"
                 data="@$(n)"
                 tree="@Tree.t:$(n)"
                 useAmbiguities="true">

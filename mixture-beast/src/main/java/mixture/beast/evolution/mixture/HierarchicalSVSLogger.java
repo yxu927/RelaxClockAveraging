@@ -4,7 +4,7 @@ import beast.base.core.BEASTObject;
 import beast.base.core.Input;
 import beast.base.core.Input.Validate;
 import beast.base.core.Loggable;
-import beast.base.evolution.likelihood.GenericTreeLikelihood;
+import beast.base.inference.Distribution;
 import beast.base.inference.parameter.RealParameter;
 import beast.base.spec.type.RealScalar;
 import beast.base.spec.type.RealVector;
@@ -44,7 +44,7 @@ public class HierarchicalSVSLogger extends BEASTObject implements Loggable {
     public final Input<Boolean> printRBStatsInput =
             new Input<>("printRBStats", "print Rao-Blackwell numerator/denominator columns for ucldStdev and sigma2", false);
 
-    private List<GenericTreeLikelihood> topSubLiks;
+    private List<Distribution> topSubLiks;
     private RealParameter legacyTopWeights;
     private RealVector typedTopWeights;
     private RealParameter legacyInnerWeights;
