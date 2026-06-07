@@ -34,7 +34,8 @@
                 mixture.beast.evolution.mixture.RelaxedRatesPriorSVS.ucldStdev,
                 mixture.beast.evolution.mixture.RelaxedRatesPriorSVS.ucldStdevScalar,
                 mixture.beast.evolution.mixture.RelaxedRatesPriorSVS.rootLogRate,
-                mixture.beast.evolution.mixture.RelaxedRatesPriorSVS.rootLogRateScalar
+                mixture.beast.evolution.mixture.RelaxedRatesPriorSVS.rootLogRateScalar,
+                mixture.beast.evolution.mixture.RelaxedRatesPriorSVS.minBranchLength
 '>
 
             <![CDATA[
