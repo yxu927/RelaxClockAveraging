@@ -293,11 +293,11 @@
             <connect srcID='SVSrawRatesMix.c:$(n)' targetID='state' inputName='stateNode'
                 if='inposterior(SVSRelaxedClockMix.c:$(n)) and SVSrawRatesMix.c:$(n)/estimate=true'/>
             <connect srcID='SVSindicatorMix.c:$(n)' targetID='state' inputName='stateNode'
-                if='inposterior(SVSindicatorMix.c:$(n)) and SVSindicatorMix.c:$(n)/estimate=true'/>
+                if='inposterior(SVSRelaxedClockMix.c:$(n)) and SVSindicatorMix.c:$(n)/estimate=true'/>
             <connect srcID='SVSsigma2Mix.c:$(n)' targetID='state' inputName='stateNode'
-                if='inposterior(SVSsigma2Mix.c:$(n)) and SVSsigma2Mix.c:$(n)/estimate=true'/>
+                if='inposterior(SVSRelaxedClockMix.c:$(n)) and SVSsigma2Mix.c:$(n)/estimate=true'/>
             <connect srcID='SVSsigmaUCLNMix.c:$(n)' targetID='state' inputName='stateNode'
-                if='inposterior(SVSsigmaUCLNMix.c:$(n)) and SVSsigmaUCLNMix.c:$(n)/estimate=true'/>
+                if='inposterior(SVSRelaxedClockMix.c:$(n)) and SVSsigmaUCLNMix.c:$(n)/estimate=true'/>
 
             <!-- CONNECT: likelihood (mixture) -->
             <!-- When SVSRelaxedClockMix is selected, replace the default treeLikelihood.$(n) in the likelihood -->
@@ -329,28 +329,28 @@
             <connect srcID='SVSrawRatesMix.c:$(n)' targetID='tracelog' inputName='log'
                 if='inposterior(SVSRelaxedClockMix.c:$(n))'/>
             <connect srcID='SVSindicatorMix.c:$(n)' targetID='tracelog' inputName='log'
-                if='inposterior(SVSindicatorMix.c:$(n))'/>
+                if='inposterior(SVSRelaxedClockMix.c:$(n))'/>
             <connect srcID='SVSsigma2Mix.c:$(n)' targetID='tracelog' inputName='log'
-                if='inposterior(SVSsigma2Mix.c:$(n))'/>
+                if='inposterior(SVSRelaxedClockMix.c:$(n))'/>
             <connect srcID='SVSsigmaUCLNMix.c:$(n)' targetID='tracelog' inputName='log'
-                if='inposterior(SVSsigmaUCLNMix.c:$(n))'/>
+                if='inposterior(SVSRelaxedClockMix.c:$(n))'/>
 
             <!-- log the SVS prior itself (optional) -->
             <connect srcID='SVSRelaxedClockMixPriorMix.c:$(n)' targetID='tracelog' inputName='log'
-                if='inposterior(SVSRelaxedClockMixPriorMix.c:$(n))'/>
+                if='inposterior(SVSRelaxedClockMix.c:$(n))'/>
 
             <!-- Mixture logging, matching the legacy-style XML example. -->
             <connect srcID='treeLikelihoodStrictSVSMix.$(n)' targetID='tracelog' inputName='log'
-                if='inposterior(mixtureTreeLikelihoodSVSMix.$(n))'>Component 0 likelihood (strict)</connect>
+                if='inposterior(SVSRelaxedClockMix.c:$(n))'>Component 0 likelihood (strict)</connect>
 
             <connect srcID='mixtureTreeLikelihoodSVSMix.$(n)' targetID='tracelog' inputName='log'
-                if='inposterior(mixtureTreeLikelihoodSVSMix.$(n))'>Mixture likelihood</connect>
+                if='inposterior(SVSRelaxedClockMix.c:$(n))'>Mixture likelihood</connect>
 
             <connect srcID='mixtureAlloc.$(n)' targetID='tracelog' inputName='log'
-                if='inposterior(mixtureTreeLikelihoodSVSMix.$(n))'>Mixture allocation diagnostics</connect>
+                if='inposterior(SVSRelaxedClockMix.c:$(n))'>Mixture allocation diagnostics</connect>
 
             <connect srcID='hierSVS.$(n)' targetID='tracelog' inputName='log'
-                if='inposterior(mixtureTreeLikelihoodSVSMix.$(n))'>Hierarchical SVS diagnostics</connect>
+                if='inposterior(SVSRelaxedClockMix.c:$(n))'>Hierarchical SVS diagnostics</connect>
 
 <!-- CONNECT: operators -->
             <connect srcID='SVSclockRateMix.scale.c:$(n)' targetID='mcmc' inputName='operator'
@@ -360,10 +360,10 @@
                 if='inposterior(SVSRelaxedClockMix.c:$(n)) and SVSclockRateMix.c:$(n)/estimate=true and Tree.t:$(n)/estimate=true'>Up/down clock rate and tree</connect>
 
             <connect srcID='SVSsigma2Mix.scale.c:$(n)' targetID='mcmc' inputName='operator'
-                if='inposterior(SVSsigma2Mix.c:$(n)) and SVSsigma2Mix.c:$(n)/estimate=true'>Scale sigma2</connect>
+                if='inposterior(SVSRelaxedClockMix.c:$(n)) and SVSsigma2Mix.c:$(n)/estimate=true'>Scale sigma2</connect>
 
             <connect srcID='SVSsigmaUCLNMix.scale.c:$(n)' targetID='mcmc' inputName='operator'
-                if='inposterior(SVSsigmaUCLNMix.c:$(n)) and SVSsigmaUCLNMix.c:$(n)/estimate=true'>Scale ucldStdev</connect>
+                if='inposterior(SVSRelaxedClockMix.c:$(n)) and SVSsigmaUCLNMix.c:$(n)/estimate=true'>Scale ucldStdev</connect>
 
             <connect srcID='SVSrawRatesMix.oneScale.c:$(n)' targetID='mcmc' inputName='operator'
                 if='inposterior(SVSRelaxedClockMix.c:$(n)) and SVSrawRatesMix.c:$(n)/estimate=true'>Scale single branch rate</connect>
@@ -372,7 +372,7 @@
                 if='inposterior(SVSRelaxedClockMix.c:$(n)) and SVSrawRatesMix.c:$(n)/estimate=true'>Scale subtree branch rates</connect>
 
             <connect srcID='SVSindicatorMix.gibbs.c:$(n)' targetID='mcmc' inputName='operator'
-                if='inposterior(SVSindicatorMix.c:$(n)) and SVSindicatorMix.c:$(n)/estimate=true'>Gibbs update indicator</connect>
+                if='inposterior(SVSRelaxedClockMix.c:$(n)) and SVSindicatorMix.c:$(n)/estimate=true'>Gibbs update indicator</connect>
 
             <connect srcID='SVSacSubtreeU.c:$(n)' targetID='mcmc' inputName='operator'
                 if='inposterior(SVSRelaxedClockMix.c:$(n)) and SVSrawRatesMix.c:$(n)/estimate=true'>Perturb AC subtree whitened residuals</connect>
