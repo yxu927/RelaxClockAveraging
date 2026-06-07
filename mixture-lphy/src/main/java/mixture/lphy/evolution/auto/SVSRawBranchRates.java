@@ -166,7 +166,7 @@ public class SVSRawBranchRates extends ParametricDistribution<Double[]> {
                 vChild = vPar;
             } else {
                 NormalDistribution nd = new NormalDistribution(
-                        random, vPar, Math.sqrt(var),
+                        random, vPar - 0.5 * var, Math.sqrt(var),
                         NormalDistribution.DEFAULT_INVERSE_ABSOLUTE_ACCURACY
                 );
                 vChild = nd.sample();
@@ -245,7 +245,7 @@ public class SVSRawBranchRates extends ParametricDistribution<Double[]> {
                 // deterministic limit
                 if (Math.abs(vChild - vPar) > 1e-9) return Double.NEGATIVE_INFINITY;
             } else {
-                double diff = vChild - vPar;
+                double diff = vChild - (vPar - 0.5 * var);
                 lp += -0.5 * (Math.log(2.0 * Math.PI * var) + (diff * diff) / var);
             }
 
