@@ -29,9 +29,5 @@
             <directory>${project.basedir}/../examples</directory>
             <outputDirectory>/examples</outputDirectory>
         </fileSet>
-        <fileSet>
-            <directory>${project.basedir}/../fxtemplates</directory>
-            <outputDirectory>/fxtemplates</outputDirectory>
-        </fileSet>
     </fileSets>
 </assembly>
