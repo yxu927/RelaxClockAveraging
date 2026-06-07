@@ -21,7 +21,8 @@
                 mixture.beast.evolution.mixture.SharedRatesClockModelSpec.rates,
                 mixture.beast.evolution.mixture.SharedRatesClockModelSpec.ratesVector,
                 mixture.beast.evolution.mixture.SharedRatesClockModelSpec.meanRate,
-                mixture.beast.evolution.mixture.SharedRatesClockModelSpec.meanRateScalar,
+                mixture.beast.evolution.mixture.SharedRatesClockModelSpec.clock.rate,
+                beast.base.spec.evolution.branchratemodel.Base.clock.rate,
                 beast.base.evolution.branchratemodel.StrictClockModel.clock.rate,
                 mixture.beast.evolution.mixture.RelaxedRatesPriorSVS.tree,
                 mixture.beast.evolution.mixture.RelaxedRatesPriorSVS.rates,
@@ -39,7 +40,10 @@
             <![CDATA[
             <!-- Typed parameters (created BEFORE use, to keep BEAUti happy) -->
 
-            <!-- Mean clock rate parameter (used by the clock model via the BEAUti-standard clock.rate input) -->
+            <!-- Mean clock rate parameter.
+                 Use the package typed meanRateScalar input instead of BEAUti's
+                 standard clock.rate input. BEAUti auto-disables standard
+                 clock.rate estimation for uncalibrated analyses. -->
             <parameter id="SVSclockRateMix.c:$(n)"
                 spec="beast.base.spec.inference.parameter.RealScalarParam"
                 estimate="true"
@@ -79,7 +83,7 @@
                 spec="mixture.beast.evolution.mixture.SharedRatesClockModelSpec"
                 tree="@Tree.t:$(n)"
                 ratesVector="@SVSrawRatesMix.c:$(n)"
-                clock.rate="@SVSclockRateMix.c:$(n)"
+                meanRateScalar="@SVSclockRateMix.c:$(n)"
                 normalize="true"/>
 
 
