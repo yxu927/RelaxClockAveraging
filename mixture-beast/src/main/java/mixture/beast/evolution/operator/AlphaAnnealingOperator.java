@@ -5,14 +5,20 @@ import beast.base.core.Input.Validate;
 import beast.base.core.Log;
 import beast.base.inference.Operator;
 import beast.base.inference.parameter.RealParameter;
+import beast.base.spec.inference.parameter.RealScalarParam;
 
 
 public class AlphaAnnealingOperator extends Operator {
 
     public final Input<RealParameter> alphaInput = new Input<>(
             "alpha",
-            "Annealing exponent parameter (dimension 1).",
-            Validate.REQUIRED);
+            "Legacy annealing exponent parameter (dimension 1).",
+            Validate.OPTIONAL);
+
+    public final Input<RealScalarParam<?>> alphaScalarInput = new Input<>(
+            "alphaScalar",
+            "BEAST3 typed mutable annealing exponent scalar.",
+            Validate.OPTIONAL);
 
     public final Input<Double> alphaStartInput = new Input<>(
             "alphaStart",
@@ -31,7 +37,8 @@ public class AlphaAnnealingOperator extends Operator {
                     + "from alphaStart to alphaEnd. If 0, alpha is never changed.",
             0);
 
-    private RealParameter alphaParam;
+    private RealParameter legacyAlpha;
+    private RealScalarParam<?> typedAlpha;
     private double alphaStart;
     private double alphaEnd;
     private int    alphaSteps;
@@ -41,16 +48,20 @@ public class AlphaAnnealingOperator extends Operator {
     @Override
     public void initAndValidate() {
 
-        alphaParam = alphaInput.get();
+        legacyAlpha = alphaInput.get();
+        typedAlpha = alphaScalarInput.get();
 
-        if (alphaParam == null) {
+        if (legacyAlpha == null && typedAlpha == null) {
             throw new IllegalArgumentException(
-                    "AlphaAnnealingOperator: input 'alpha' is not set.\n"
-                            + "Fix your XML by adding: alpha='@alpha' (or <alpha idref='alpha'/>),\n"
-                            + "and make sure a RealParameter with id='alpha' exists INSIDE <state> as a stateNode.");
+                    "AlphaAnnealingOperator: either alpha or alphaScalar must be specified.\n"
+                            + "For legacy XML add alpha='@alpha'. For BEAST3 typed XML add alphaScalar='@alpha'.");
+        }
+        if (legacyAlpha != null && typedAlpha != null) {
+            throw new IllegalArgumentException(
+                    "AlphaAnnealingOperator: specify only one of alpha or alphaScalar.");
         }
 
-        if (alphaParam.getDimension() != 1) {
+        if (legacyAlpha != null && legacyAlpha.getDimension() != 1) {
             throw new IllegalArgumentException(
                     "AlphaAnnealingOperator: alpha parameter must have dimension 1.");
         }
@@ -66,7 +77,7 @@ public class AlphaAnnealingOperator extends Operator {
             throw new IllegalArgumentException("require alphaStart ≥ alphaEnd.");
         }
 
-        final double current = alphaParam.getArrayValue(0);
+        final double current = alphaValue();
 
         if (Math.abs(current - alphaStart) > 1e-8) {
             Log.warning(String.format(
@@ -89,7 +100,7 @@ public class AlphaAnnealingOperator extends Operator {
             return 0.0;
         }
 
-        final double a = alphaParam.getArrayValue(0);
+        final double a = alphaValue();
 
         if (a <= alphaEnd) {
             return 0.0;
@@ -98,8 +109,20 @@ public class AlphaAnnealingOperator extends Operator {
         double newA = a - delta;
         if (newA < alphaEnd) newA = alphaEnd;
 
-        alphaParam.setValue(0, newA);
+        setAlphaValue(newA);
 
         return 0.0;
+    }
+
+    private double alphaValue() {
+        return legacyAlpha != null ? legacyAlpha.getArrayValue(0) : typedAlpha.get();
+    }
+
+    private void setAlphaValue(final double value) {
+        if (legacyAlpha != null) {
+            legacyAlpha.setValue(0, value);
+        } else {
+            typedAlpha.set(value);
+        }
     }
 }

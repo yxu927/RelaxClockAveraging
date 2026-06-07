@@ -6,6 +6,8 @@ import beast.base.core.Input.Validate;
 import beast.base.core.Loggable;
 import beast.base.evolution.likelihood.GenericTreeLikelihood;
 import beast.base.inference.parameter.RealParameter;
+import beast.base.spec.type.RealScalar;
+import beast.base.spec.type.RealVector;
 
 import java.io.PrintStream;
 import java.text.DecimalFormat;
@@ -63,8 +65,10 @@ public class MixtureLikelihoodLogger extends BEASTObject implements Loggable {
 
     private int K;
     private List<GenericTreeLikelihood> subLiks;
-    private RealParameter weights;
-    private RealParameter alpha;
+    private RealParameter legacyWeights;
+    private RealVector typedWeights;
+    private RealParameter legacyAlpha;
+    private RealScalar typedAlpha;
 
     private boolean printTotalLogP;
     private boolean printLogMix;
@@ -97,17 +101,28 @@ public class MixtureLikelihoodLogger extends BEASTObject implements Loggable {
         final MixtureTreeLikelihood mix = mixtureInput.get();
 
         this.subLiks = new ArrayList<>(mix.subLikelihoodsInput.get());
-        this.weights = mix.weightsInput.get();
-        this.alpha = mix.alphaInput.get(); // may be null
+        this.legacyWeights = mix.weightsInput.get();
+        this.typedWeights = mix.weightsVectorInput.get();
+        this.legacyAlpha = mix.alphaInput.get();
+        this.typedAlpha = mix.alphaScalarInput.get();
         this.K = subLiks.size();
 
         if (K < 2) {
             throw new IllegalArgumentException(getClass().getSimpleName() + ": need K >= 2");
         }
-        if (weights.getDimension() != K) {
+        if (legacyWeights == null && typedWeights == null) {
+            throw new IllegalArgumentException("MixtureLikelihoodLogger: either mixture weights or weightsVector must be available.");
+        }
+        if (legacyWeights != null && typedWeights != null) {
+            throw new IllegalArgumentException("MixtureLikelihoodLogger: mixture specifies both weights and weightsVector.");
+        }
+        if (legacyAlpha != null && typedAlpha != null) {
+            throw new IllegalArgumentException("MixtureLikelihoodLogger: mixture specifies both alpha and alphaScalar.");
+        }
+        if (weightsDimension() != K) {
             throw new IllegalArgumentException(getClass().getSimpleName() + ": weights dimension != K");
         }
-        if (alpha != null && alpha.getDimension() != 1) {
+        if (legacyAlpha != null && legacyAlpha.getDimension() != 1) {
             throw new IllegalArgumentException(getClass().getSimpleName() + ": alpha must have dimension=1");
         }
 
@@ -163,7 +178,7 @@ public class MixtureLikelihoodLogger extends BEASTObject implements Loggable {
 
     @Override
     public void log(final long sample, final PrintStream out) {
-        final double a = (alpha == null ? 0.0 : alpha.getArrayValue(0));
+        final double a = alphaValue();
 
         final boolean needWeights = printWeights || printTotalLogP || printLogMix || printResp || printLogS
                 || printSumWeights || printMaxLogS || printMixMinusMaxLogS;
@@ -172,7 +187,7 @@ public class MixtureLikelihoodLogger extends BEASTObject implements Loggable {
                 || (a != 0.0) || printCouplingTerm;
 
         if (needWeights) {
-            for (int k = 0; k < K; k++) wk[k] = weights.getArrayValue(k);
+            for (int k = 0; k < K; k++) wk[k] = weightValue(k);
         }
 
         if (needLogL) {
@@ -278,6 +293,28 @@ public class MixtureLikelihoodLogger extends BEASTObject implements Loggable {
 
     @Override
     public void close(final PrintStream out) { }
+
+    private int weightsDimension() {
+        return legacyWeights != null ? legacyWeights.getDimension() : typedWeights.size();
+    }
+
+    private double weightValue(final int k) {
+        return legacyWeights != null ? legacyWeights.getArrayValue(k) : typedWeights.get(k);
+    }
+
+    private boolean hasAlpha() {
+        return legacyAlpha != null || typedAlpha != null;
+    }
+
+    private double alphaValue() {
+        if (legacyAlpha != null) {
+            return legacyAlpha.getArrayValue(0);
+        }
+        if (typedAlpha != null) {
+            return typedAlpha.get();
+        }
+        return 0.0;
+    }
 
     private static String fmt(final double x) {
         if (Double.isNaN(x)) return "NaN";

@@ -5,6 +5,9 @@ import beast.base.core.Input;
 import beast.base.inference.Operator;
 import beast.base.inference.parameter.IntegerParameter;
 import beast.base.inference.parameter.RealParameter;
+import beast.base.spec.inference.parameter.IntScalarParam;
+import beast.base.spec.inference.parameter.RealScalarParam;
+import beast.base.spec.inference.parameter.RealVectorParam;
 import beast.base.util.Randomizer;
 
 @Description("UC-only non-centered hyper move: changes ucldStdev while keeping latent z_i fixed, "
@@ -14,20 +17,38 @@ public class UCLDStdevNonCenteredOperator extends Operator {
 
     public final Input<RealParameter> ratesInput = new Input<>(
             "rates",
-            "shared positive branch rates (non-root nodes)",
-            Input.Validate.REQUIRED
+            "Legacy shared positive branch rates (non-root nodes).",
+            Input.Validate.OPTIONAL
+    );
+
+    public final Input<RealVectorParam<?>> ratesVectorInput = new Input<>(
+            "ratesVector",
+            "BEAST3 typed mutable shared positive branch rates (non-root nodes).",
+            Input.Validate.OPTIONAL
     );
 
     public final Input<IntegerParameter> indicatorInput = new Input<>(
             "indicator",
-            "0=UC, 1=AC",
-            Input.Validate.REQUIRED
+            "Legacy scalar indicator; 0=UC, 1=AC.",
+            Input.Validate.OPTIONAL
+    );
+
+    public final Input<IntScalarParam<?>> indicatorScalarInput = new Input<>(
+            "indicatorScalar",
+            "BEAST3 typed mutable scalar indicator; 0=UC, 1=AC.",
+            Input.Validate.OPTIONAL
     );
 
     public final Input<RealParameter> ucldStdevInput = new Input<>(
             "ucldStdev",
-            "UC lognormal stdev (sigma on log scale)",
-            Input.Validate.REQUIRED
+            "Legacy UC lognormal stdev (sigma on log scale).",
+            Input.Validate.OPTIONAL
+    );
+
+    public final Input<RealScalarParam<?>> ucldStdevScalarInput = new Input<>(
+            "ucldStdevScalar",
+            "BEAST3 typed mutable UC lognormal stdev (sigma on log scale).",
+            Input.Validate.OPTIONAL
     );
 
     public final Input<Double> windowInput = new Input<>(
@@ -43,30 +64,86 @@ public class UCLDStdevNonCenteredOperator extends Operator {
             true
     );
 
-    private RealParameter rates;
-    private IntegerParameter indicator;
-    private RealParameter ucldStdev;
+    private RealParameter legacyRates;
+    private RealVectorParam<?> typedRates;
+    private IntegerParameter legacyIndicator;
+    private IntScalarParam<?> typedIndicator;
+    private RealParameter legacyUcldStdev;
+    private RealScalarParam<?> typedUcldStdev;
 
     @Override
     public void initAndValidate() {
-        rates = ratesInput.get();
-        indicator = indicatorInput.get();
-        ucldStdev = ucldStdevInput.get();
+        legacyRates = ratesInput.get();
+        typedRates = ratesVectorInput.get();
+        legacyIndicator = indicatorInput.get();
+        typedIndicator = indicatorScalarInput.get();
+        legacyUcldStdev = ucldStdevInput.get();
+        typedUcldStdev = ucldStdevScalarInput.get();
 
-        if (rates.getDimension() < 1) {
-            throw new IllegalArgumentException("rates dimension must be >= 1");
+        requireExactlyOne(legacyRates, typedRates, "rates", "ratesVector");
+        requireExactlyOne(legacyIndicator, typedIndicator, "indicator", "indicatorScalar");
+        requireExactlyOne(legacyUcldStdev, typedUcldStdev, "ucldStdev", "ucldStdevScalar");
+
+        if (rateDimension() < 1) {
+            throw new IllegalArgumentException("UCLDStdevNonCenteredOperator: rates dimension must be >= 1");
         }
-        if (indicator.getDimension() != 1) {
-            throw new IllegalArgumentException("indicator dimension must be 1");
+        if (legacyIndicator != null && legacyIndicator.getDimension() != 1) {
+            throw new IllegalArgumentException("UCLDStdevNonCenteredOperator: indicator dimension must be 1");
         }
-        if (ucldStdev.getDimension() != 1) {
-            throw new IllegalArgumentException("ucldStdev dimension must be 1");
+        if (legacyUcldStdev != null && legacyUcldStdev.getDimension() != 1) {
+            throw new IllegalArgumentException("UCLDStdevNonCenteredOperator: ucldStdev dimension must be 1");
+        }
+    }
+
+    private static void requireExactlyOne(final Object legacy,
+                                          final Object typed,
+                                          final String legacyName,
+                                          final String typedName) {
+        if (legacy == null && typed == null) {
+            throw new IllegalArgumentException("UCLDStdevNonCenteredOperator: either "
+                    + legacyName + " or " + typedName + " must be specified.");
+        }
+        if (legacy != null && typed != null) {
+            throw new IllegalArgumentException("UCLDStdevNonCenteredOperator: specify only one of "
+                    + legacyName + " or " + typedName + ".");
+        }
+    }
+
+    private int rateDimension() {
+        return legacyRates != null ? legacyRates.getDimension() : typedRates.size();
+    }
+
+    private double rateValue(final int i) {
+        return legacyRates != null ? legacyRates.getValue(i) : typedRates.get(i);
+    }
+
+    private void setRateValue(final int i, final double value) {
+        if (legacyRates != null) {
+            legacyRates.setValue(i, value);
+        } else {
+            typedRates.set(i, value);
+        }
+    }
+
+    private int indicatorValue() {
+        return legacyIndicator != null ? legacyIndicator.getValue(0) : typedIndicator.get();
+    }
+
+    private double ucldStdevValue() {
+        return legacyUcldStdev != null ? legacyUcldStdev.getValue(0) : typedUcldStdev.get();
+    }
+
+    private void setUcldStdevValue(final double value) {
+        if (legacyUcldStdev != null) {
+            legacyUcldStdev.setValue(0, value);
+        } else {
+            typedUcldStdev.set(value);
         }
     }
 
     @Override
     public double proposal() {
-        final int k = indicator.getValue(0);
+        final int k = indicatorValue();
         if (k != 0) {
             return rejectIfNotUCInput.get() ? Double.NEGATIVE_INFINITY : 0.0;
         }
@@ -76,7 +153,7 @@ public class UCLDStdevNonCenteredOperator extends Operator {
             return Double.NEGATIVE_INFINITY;
         }
 
-        final double oldS = ucldStdev.getValue(0);
+        final double oldS = ucldStdevValue();
         if (!(oldS > 0.0)) {
             return Double.NEGATIVE_INFINITY;
         }
@@ -87,7 +164,7 @@ public class UCLDStdevNonCenteredOperator extends Operator {
             return Double.NEGATIVE_INFINITY;
         }
 
-        final int nEdges = rates.getDimension();
+        final int nEdges = rateDimension();
         final double oldVar = oldS * oldS;
         final double newVar = newS * newS;
 
@@ -95,7 +172,7 @@ public class UCLDStdevNonCenteredOperator extends Operator {
         double sumDelta = 0.0;
 
         for (int i = 0; i < nEdges; i++) {
-            final double r = rates.getValue(i);
+            final double r = rateValue(i);
             if (!(r > 0.0)) {
                 return Double.NEGATIVE_INFINITY;
             }
@@ -113,13 +190,17 @@ public class UCLDStdevNonCenteredOperator extends Operator {
             sumDelta += (xNew - xOld);
         }
 
-        rates.startEditing(this);
+        if (legacyRates != null) {
+            legacyRates.startEditing(this);
+        }
         for (int i = 0; i < nEdges; i++) {
-            rates.setValue(i, rNew[i]);
+            setRateValue(i, rNew[i]);
         }
 
-        ucldStdev.startEditing(this);
-        ucldStdev.setValue(0, newS);
+        if (legacyUcldStdev != null) {
+            legacyUcldStdev.startEditing(this);
+        }
+        setUcldStdevValue(newS);
 
         return sumDelta + (nEdges + 1.0) * eps;
     }

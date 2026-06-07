@@ -11,6 +11,8 @@ import beast.base.evolution.likelihood.GenericTreeLikelihood;
 import beast.base.inference.Distribution;
 import beast.base.inference.State;
 import beast.base.inference.parameter.RealParameter;
+import beast.base.spec.type.RealScalar;
+import beast.base.spec.type.RealVector;
 
 public class MixtureTreeLikelihood extends Distribution {
 
@@ -21,40 +23,63 @@ public class MixtureTreeLikelihood extends Distribution {
 
     public final Input<RealParameter> weightsInput = new Input<>(
             "weights",
-            "Mixture weights w (dimension K). Usually sum to 1.",
-            Validate.REQUIRED);
+            "Legacy mixture weights w (dimension K). Usually sum to 1.",
+            Validate.OPTIONAL);
+
+    public final Input<RealVector> weightsVectorInput = new Input<>(
+            "weightsVector",
+            "BEAST3 typed mixture weights w (dimension K). Usually sum to 1.",
+            Validate.OPTIONAL);
 
     public final Input<RealParameter> alphaInput = new Input<>(
             "alpha",
-            "Coupling exponent alpha (dimension 1). If provided, total logP = logMix + alpha * sum_i logL_i.",
+            "Legacy coupling exponent alpha (dimension 1). If provided, total logP = logMix + alpha * sum_i logL_i.",
             (RealParameter) null);
 
+    public final Input<RealScalar> alphaScalarInput = new Input<>(
+            "alphaScalar",
+            "BEAST3 typed coupling exponent alpha. If provided, total logP = logMix + alpha * sum_i logL_i.",
+            Validate.OPTIONAL);
+
     private List<GenericTreeLikelihood> subLikelihoods;
-    private RealParameter weights;
-    private RealParameter alpha;
+    private RealParameter legacyWeights;
+    private RealVector typedWeights;
+    private RealParameter legacyAlpha;
+    private RealScalar typedAlpha;
     private int K;
 
     @Override
     public void initAndValidate() {
         subLikelihoods = subLikelihoodsInput.get();
-        weights = weightsInput.get();
-        alpha = alphaInput.get();
+        legacyWeights = weightsInput.get();
+        typedWeights = weightsVectorInput.get();
+        legacyAlpha = alphaInput.get();
+        typedAlpha = alphaScalarInput.get();
         K = subLikelihoods.size();
 
         if (K < 2) {
             throw new IllegalArgumentException("MixtureTreeLikelihood: need at least two subLikelihoods.");
         }
-        if (weights.getDimension() != K) {
-            throw new IllegalArgumentException("MixtureTreeLikelihood: weights dimension ("
-                    + weights.getDimension() + ") != number of subLikelihoods (" + K + ").");
+        if (legacyWeights == null && typedWeights == null) {
+            throw new IllegalArgumentException("MixtureTreeLikelihood: either weights or weightsVector must be specified.");
         }
-        if (alpha != null && alpha.getDimension() != 1) {
+        if (legacyWeights != null && typedWeights != null) {
+            throw new IllegalArgumentException("MixtureTreeLikelihood: specify only one of weights or weightsVector.");
+        }
+        if (legacyAlpha != null && typedAlpha != null) {
+            throw new IllegalArgumentException("MixtureTreeLikelihood: specify only one of alpha or alphaScalar.");
+        }
+        if (weightsDimension() != K) {
+            throw new IllegalArgumentException("MixtureTreeLikelihood: weights dimension ("
+                    + weightsDimension() + ") != number of subLikelihoods (" + K + ").");
+        }
+        if (legacyAlpha != null && legacyAlpha.getDimension() != 1) {
             throw new IllegalArgumentException("MixtureTreeLikelihood: alpha must have dimension 1.");
         }
 
         double wsum = 0.0;
         for (int i = 0; i < K; i++) {
-            double wi = weights.getArrayValue(i);
+            double wi = weightValue(i);
             if (wi < 0.0) {
                 throw new IllegalArgumentException("MixtureTreeLikelihood: negative weight w[" + i + "]=" + wi);
             }
@@ -69,7 +94,7 @@ public class MixtureTreeLikelihood extends Distribution {
     @Override
     public double calculateLogP() {
 
-        final double a = (alpha == null ? 0.0 : alpha.getArrayValue(0));
+        final double a = alphaValue();
 
         double maxTerm = Double.NEGATIVE_INFINITY;
         double sumLogL = 0.0;
@@ -79,7 +104,7 @@ public class MixtureTreeLikelihood extends Distribution {
 
         for (int i = 0; i < K; i++) {
 
-            final double wi = weights.getArrayValue(i);
+            final double wi = weightValue(i);
             final boolean needThisLi = needCoupling || (wi > 0.0);
 
             if (!needThisLi) {
@@ -149,4 +174,22 @@ public class MixtureTreeLikelihood extends Distribution {
 
     @Override
     protected boolean requiresRecalculation() { return true; }
+
+    private int weightsDimension() {
+        return legacyWeights != null ? legacyWeights.getDimension() : typedWeights.size();
+    }
+
+    private double weightValue(final int i) {
+        return legacyWeights != null ? legacyWeights.getArrayValue(i) : typedWeights.get(i);
+    }
+
+    private double alphaValue() {
+        if (legacyAlpha != null) {
+            return legacyAlpha.getArrayValue(0);
+        }
+        if (typedAlpha != null) {
+            return typedAlpha.get();
+        }
+        return 0.0;
+    }
 }
