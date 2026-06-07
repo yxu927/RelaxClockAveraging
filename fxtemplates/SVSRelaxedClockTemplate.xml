@@ -311,9 +311,9 @@
             <connect srcID='treeLikelihood.$(n)' targetID='likelihood' inputName='distribution'
                 if='SVSRelaxedClockMix.c:$(n)/tree=null'/>
 
-            <!-- CONNECT: priors -->
-            <connect srcID='SVSRelaxedClockMixPriorMix.c:$(n)' targetID='prior' inputName='distribution'
-                if='inposterior(SVSRelaxedClockMix.c:$(n))'>SVS prior on branch rates (mixture package)</connect>
+            <!-- CONNECT: structural posterior term and user-editable priors -->
+            <connect srcID='SVSRelaxedClockMixPriorMix.c:$(n)' targetID='posterior' inputName='distribution'
+                if='inposterior(SVSRelaxedClockMix.c:$(n))'>SVS structural prior on branch rates (mixture package)</connect>
 
             <connect srcID='SVSclockRateMix.prior.c:$(n)' targetID='prior' inputName='distribution'
                 if='inposterior(SVSRelaxedClockMix.c:$(n)) and SVSclockRateMix.c:$(n)/estimate=true'>Clock rate prior</connect>
