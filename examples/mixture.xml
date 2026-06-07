@@ -221,7 +221,7 @@ spec="Alignment">
                 </distribution>
             </distribution>
             <distribution id="likelihood" spec="CompoundDistribution">
-                <distribution id="D.mixtureTreeLikelihood" spec="mixture.beast.evolution.mixture.MixtureTreeLikelihood">
+                <distribution id="D.mixtureTreeLikelihood" spec="mixture.beast.evolution.mixture.MixtureTreeLikelihood" data="@D" tree="@psi" siteModel="@SiteModel1">
                     <subLikelihood id="D.treeLikelihood.component0" spec="ThreadedTreeLikelihood" tree="@psi" useAmbiguities="true">
                         <data idref="D"/>
                         <siteModel id="SiteModel" spec="beast.base.spec.evolution.sitemodel.SiteModel" gammaCategoryCount="4" shape="@gamma">

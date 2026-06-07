@@ -10,10 +10,11 @@ import beast.base.core.Log;
 import beast.base.inference.Distribution;
 import beast.base.inference.State;
 import beast.base.inference.parameter.RealParameter;
+import beast.base.spec.evolution.likelihood.GenericTreeLikelihood;
 import beast.base.spec.type.RealScalar;
 import beast.base.spec.type.RealVector;
 
-public class MixtureTreeLikelihood extends Distribution {
+public class MixtureTreeLikelihood extends GenericTreeLikelihood {
 
     public final Input<List<Distribution>> subLikelihoodsInput = new Input<>(
             "subLikelihood",

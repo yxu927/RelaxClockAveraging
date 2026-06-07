@@ -1,6 +1,24 @@
 <beast version='2.0'
     namespace='beastfx.app.beauti:beastfx.app.inputeditor:beast.pkgmgmt:beast.base.core:beast.base.inference:beast.base.inference.parameter:beast.base.inference.distribution:beast.base.inference.operator:beast.base.inference.operator.kernel:beast.base.evolution.branchratemodel:beast.base.evolution.tree:beast.base.evolution.operator:beast.base.evolution.operator.kernel:mixture.beast.evolution.mixture:mixture.beast.evolution.operator'>
 
+    <!-- Legacy Prior editor support.
+         BEAUti 3 still uses the deprecated Prior + ParametricDistribution editor
+         for <prior> wrappers. Register LogNormalDistributionModel so existing
+         SVS hyperparameter priors show a selected distribution in the Priors tab.
+    -->
+    <mergewith point='parametricDistributions'>
+        <subtemplate id='LogNormalDistributionModel'
+            class='beast.base.inference.distribution.LogNormalDistributionModel'
+            mainid='[top]'>
+            <![CDATA[
+            <distr spec="beast.base.inference.distribution.LogNormalDistributionModel">
+                <parameter name="M" spec="parameter.RealParameter" estimate="false">0.0</parameter>
+                <parameter name="S" spec="parameter.RealParameter" estimate="false" lower="0.0">1.0</parameter>
+            </distr>
+]]>
+        </subtemplate>
+    </mergewith>
+
     <!-- Clock models -->
     <mergewith point='clockModelTemplates'>
 
@@ -243,7 +261,11 @@
 
             <!-- Mixture tree likelihood (replaces treeLikelihood.$(n) in likelihood) -->
             <distribution id="mixtureTreeLikelihoodSVSMix.$(n)"
-                spec="mixture.beast.evolution.mixture.MixtureTreeLikelihood">
+                spec="mixture.beast.evolution.mixture.MixtureTreeLikelihood"
+                data="@$(n)"
+                tree="@Tree.t:$(n)"
+                siteModel="@SiteModel.s:$(n)"
+                branchRateModel="@SVSRelaxedClockMix.c:$(n)">
                 <subLikelihood idref="treeLikelihoodStrictSVSMix.$(n)"/>
                 <subLikelihood idref="treeLikelihood.$(n)"/>
                 <parameter id="w_topSVSMix.$(n)"
