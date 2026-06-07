@@ -3,6 +3,7 @@ package mixture.beast.evolution.util;
 import beast.base.evolution.tree.Node;
 import beast.base.evolution.tree.Tree;
 import beast.base.inference.parameter.RealParameter;
+import beast.base.spec.inference.parameter.RealVectorParam;
 
 import java.util.Arrays;
 
@@ -168,9 +169,56 @@ public final class BranchRateIndexHelper {
                 + "as a scalar so they can be expanded automatically.");
     }
 
+    public static void validateRatesDimension(final Tree tree,
+                                              final RealVectorParam<?> rates,
+                                              final String ownerName) {
+        if (tree == null) {
+            throw new IllegalArgumentException(ownerName + ": tree is null");
+        }
+        if (rates == null) {
+            throw new IllegalArgumentException(ownerName + ": ratesVector is null");
+        }
+
+        final int expected = tree.getNodeCount() - 1;
+        final int observed = rates.size();
+
+        if (expected < 1) {
+            throw new IllegalArgumentException(ownerName + ": tree must contain at least one non-root branch. "
+                    + "Found nodeCount=" + tree.getNodeCount());
+        }
+
+        if (observed == expected) {
+            return;
+        }
+
+        if (observed == 1) {
+            final double initialValue = rates.get(0);
+            rates.setDimension(expected);
+            for (int i = 0; i < expected; i++) {
+                rates.set(i, initialValue);
+            }
+            return;
+        }
+
+        throw new IllegalArgumentException(ownerName + ": ratesVector must have dimension (nodeCount - 1). Found "
+                + observed + " vs " + expected
+                + ". Initialise typed shared rates as a scalar so they can be expanded automatically.");
+    }
+
     public static Mapping ensureUpToDate(final Tree tree,
                                          final Mapping mapping,
                                          final RealParameter rates,
+                                         final String ownerName) {
+        validateRatesDimension(tree, rates, ownerName);
+        if (mapping == null || !mapping.matches(tree)) {
+            return buildDeterministic(tree);
+        }
+        return mapping;
+    }
+
+    public static Mapping ensureUpToDate(final Tree tree,
+                                         final Mapping mapping,
+                                         final RealVectorParam<?> rates,
                                          final String ownerName) {
         validateRatesDimension(tree, rates, ownerName);
         if (mapping == null || !mapping.matches(tree)) {

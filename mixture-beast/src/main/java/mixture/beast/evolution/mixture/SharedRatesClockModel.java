@@ -5,8 +5,12 @@ import beast.base.core.Log;
 import beast.base.evolution.branchratemodel.BranchRateModel;
 import beast.base.evolution.tree.Node;
 import beast.base.evolution.tree.Tree;
+import beast.base.inference.CalculationNode;
 import beast.base.inference.StateNode;
 import beast.base.inference.parameter.RealParameter;
+import beast.base.spec.inference.parameter.RealVectorParam;
+import beast.base.spec.type.RealScalar;
+import beast.base.spec.type.RealVector;
 import mixture.beast.evolution.util.BranchRateIndexHelper;
 
 public class SharedRatesClockModel extends BranchRateModel.Base {
@@ -19,8 +23,16 @@ public class SharedRatesClockModel extends BranchRateModel.Base {
 
     public final Input<RealParameter> ratesInput = new Input<>(
             "rates",
-            "positive branch rates for NON-root nodes; dimension=(tree.nodeCount - 1)",
-            Input.Validate.REQUIRED
+            "Legacy BEAST parameter containing one rate multiplier per non-root branch. "
+                    + "Kept for backwards compatibility with existing XML.",
+            Input.Validate.OPTIONAL
+    );
+
+    public final Input<RealVector> ratesVectorInput = new Input<>(
+            "ratesVector",
+            "BEAST3 typed real vector containing one rate multiplier per non-root branch. "
+                    + "Use this for spec.parameter.RealVectorParam XML.",
+            Input.Validate.OPTIONAL
     );
 
     public final Input<Boolean> normalizeInput = new Input<>(
@@ -31,12 +43,23 @@ public class SharedRatesClockModel extends BranchRateModel.Base {
 
     public final Input<RealParameter> meanRateInput = new Input<>(
             "meanRate",
-            "overall rate multiplier (dimension=1, default=1.0)."
+            "Legacy BEAST parameter for the overall mean substitution rate. "
+                    + "Kept for backwards compatibility with existing XML.",
+            Input.Validate.OPTIONAL
+    );
+
+    public final Input<RealScalar> meanRateScalarInput = new Input<>(
+            "meanRateScalar",
+            "BEAST3 typed real scalar for the overall mean substitution rate. "
+                    + "Use this for spec.parameter.RealScalarParam XML.",
+            Input.Validate.OPTIONAL
     );
 
     private Tree tree;
-    private RealParameter rates;
-    private RealParameter meanRate;
+    private RealParameter legacyRates;
+    private RealVector typedRates;
+    private RealParameter legacyMeanRate;
+    private RealScalar typedMeanRate;
     private boolean doNormalize;
 
     private BranchRateIndexHelper.Mapping mapping;
@@ -47,19 +70,27 @@ public class SharedRatesClockModel extends BranchRateModel.Base {
     @Override
     public void initAndValidate() {
         tree = treeInput.get();
-        rates = ratesInput.get();
         doNormalize = normalizeInput.get();
 
-        meanRate = meanRateInput.get();
-        if (meanRate == null) {
-            meanRate = new RealParameter("1.0");
+        legacyRates = ratesInput.get();
+        typedRates = ratesVectorInput.get();
+        if (legacyRates == null && typedRates == null) {
+            throw new IllegalArgumentException("Either rates or ratesVector must be specified.");
+        }
+        if (legacyRates != null && typedRates != null) {
+            throw new IllegalArgumentException("Specify only one of rates or ratesVector.");
         }
 
-        if (meanRate.getDimension() != 1) {
+        legacyMeanRate = meanRateInput.get();
+        typedMeanRate = meanRateScalarInput.get();
+        if (legacyMeanRate != null && typedMeanRate != null) {
+            throw new IllegalArgumentException("Specify only one of meanRate or meanRateScalar.");
+        }
+        if (legacyMeanRate != null && legacyMeanRate.getDimension() != 1) {
             throw new IllegalArgumentException("meanRate must have dimension=1.");
         }
 
-        BranchRateIndexHelper.validateRatesDimension(tree, rates, "SharedRatesClockModel");
+        validateOrExpandRatesDimension();
         mapping = BranchRateIndexHelper.buildDeterministic(tree);
 
         if (doNormalize) {
@@ -73,7 +104,80 @@ public class SharedRatesClockModel extends BranchRateModel.Base {
     }
 
     private void ensureMappingUpToDate() {
-        mapping = BranchRateIndexHelper.ensureUpToDate(tree, mapping, rates, "SharedRatesClockModel");
+        validateOrExpandRatesDimension();
+        if (mapping == null || !mapping.matches(tree)) {
+            mapping = BranchRateIndexHelper.buildDeterministic(tree);
+        }
+    }
+
+    private int rateDimension() {
+        if (legacyRates != null) {
+            return legacyRates.getDimension();
+        }
+        return typedRates.size();
+    }
+
+    private double rawRateValue(final int i) {
+        if (legacyRates != null) {
+            return legacyRates.getValue(i);
+        }
+        if (typedRates.size() == 1) {
+            return typedRates.get(0);
+        }
+        return typedRates.get(i);
+    }
+
+    private double meanRateValue() {
+        if (legacyMeanRate != null) {
+            return legacyMeanRate.getValue();
+        }
+        if (typedMeanRate != null) {
+            return typedMeanRate.get();
+        }
+        return 1.0;
+    }
+
+    private boolean ratesDirty() {
+        if (legacyRates != null) {
+            return legacyRates.somethingIsDirty();
+        }
+        return typedRates instanceof CalculationNode && ((CalculationNode) typedRates).somethingIsDirty();
+    }
+
+    private boolean meanRateDirty() {
+        if (legacyMeanRate != null) {
+            return legacyMeanRate.somethingIsDirty();
+        }
+        return typedMeanRate instanceof CalculationNode && ((CalculationNode) typedMeanRate).somethingIsDirty();
+    }
+
+    private void validateOrExpandRatesDimension() {
+        if (legacyRates != null) {
+            BranchRateIndexHelper.validateRatesDimension(tree, legacyRates, "SharedRatesClockModel");
+            return;
+        }
+
+        final int expected = tree.getNodeCount() - 1;
+        if (expected < 1) {
+            throw new IllegalArgumentException("SharedRatesClockModel: tree must contain at least one non-root branch. "
+                    + "Found nodeCount=" + tree.getNodeCount());
+        }
+
+        final int observed = rateDimension();
+        if (observed == expected) {
+            return;
+        }
+
+        if (observed == 1) {
+            if (typedRates instanceof RealVectorParam<?>) {
+                ((RealVectorParam<?>) typedRates).setDimension(expected);
+            }
+            return;
+        }
+
+        throw new IllegalArgumentException("SharedRatesClockModel: ratesVector must have dimension "
+                + "(tree.nodeCount - 1). Found " + observed + " vs " + expected
+                + ". Scalar typed rates can be expanded or broadcast across all non-root branches.");
     }
 
     @Override
@@ -84,7 +188,7 @@ public class SharedRatesClockModel extends BranchRateModel.Base {
 
         ensureMappingUpToDate();
 
-        final double mr = meanRate.getValue();
+        final double mr = meanRateValue();
         if (!(mr > 0.0)) {
             return 0.0;
         }
@@ -94,7 +198,7 @@ public class SharedRatesClockModel extends BranchRateModel.Base {
             return 0.0;
         }
 
-        final double r = rates.getValue(idx);
+        final double r = rawRateValue(idx);
         if (!(r > 0.0)) {
             return 0.0;
         }
@@ -121,7 +225,7 @@ public class SharedRatesClockModel extends BranchRateModel.Base {
             }
 
             final int idx = mapping.idxForNode(node);
-            final double r = rates.getValue(idx);
+            final double r = rawRateValue(idx);
             if (!(r > 0.0)) {
                 continue;
             }
@@ -145,10 +249,10 @@ public class SharedRatesClockModel extends BranchRateModel.Base {
             dirty = true;
             ensureMappingUpToDate();
         }
-        if (rates != null && rates.somethingIsDirty()) {
+        if (ratesDirty()) {
             dirty = true;
         }
-        if (meanRate != null && meanRate.somethingIsDirty()) {
+        if (meanRateDirty()) {
             dirty = true;
         }
 

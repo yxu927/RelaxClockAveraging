@@ -4,6 +4,7 @@ import beast.base.core.Description;
 import beast.base.core.Input;
 import beast.base.inference.Operator;
 import beast.base.inference.parameter.IntegerParameter;
+import beast.base.spec.inference.parameter.IntScalarParam;
 import beast.base.util.Randomizer;
 import mixture.beast.evolution.mixture.RelaxedRatesPriorSVS;
 
@@ -15,7 +16,13 @@ public class IndicatorGibbsOperator extends Operator {
     public final Input<IntegerParameter> indicatorInput = new Input<>(
             "indicator",
             "binary indicator parameter (dimension=1)",
-            Input.Validate.REQUIRED
+            Input.Validate.OPTIONAL
+    );
+
+    public final Input<IntScalarParam<?>> indicatorScalarInput = new Input<>(
+            "indicatorScalar",
+            "BEAST3 typed mutable integer scalar; 0=uncorrelated, 1=autocorrelated.",
+            Input.Validate.OPTIONAL
     );
 
     public final Input<RelaxedRatesPriorSVS> priorInput = new Input<>(
@@ -30,17 +37,25 @@ public class IndicatorGibbsOperator extends Operator {
             0.5
     );
 
-    private IntegerParameter indicator;
+    private IntegerParameter legacyIndicator;
+    private IntScalarParam<?> typedIndicator;
     private RelaxedRatesPriorSVS prior;
     private double pOne;
 
     @Override
     public void initAndValidate() {
-        indicator = indicatorInput.get();
+        legacyIndicator = indicatorInput.get();
+        typedIndicator = indicatorScalarInput.get();
         prior = priorInput.get();
         pOne = pOneInput.get();
 
-        if (indicator.getDimension() != 1) {
+        if (legacyIndicator == null && typedIndicator == null) {
+            throw new IllegalArgumentException("IndicatorGibbsOperator: either indicator or indicatorScalar must be specified.");
+        }
+        if (legacyIndicator != null && typedIndicator != null) {
+            throw new IllegalArgumentException("IndicatorGibbsOperator: specify only one of indicator or indicatorScalar.");
+        }
+        if (legacyIndicator != null && legacyIndicator.getDimension() != 1) {
             throw new IllegalArgumentException("IndicatorGibbsOperator: indicator must have dimension=1.");
         }
         if (!(pOne > 0.0 && pOne < 1.0)) {
@@ -56,9 +71,24 @@ public class IndicatorGibbsOperator extends Operator {
         return b + Math.log1p(Math.exp(a - b));
     }
 
+    private int indicatorValue() {
+        if (legacyIndicator != null) {
+            return legacyIndicator.getValue(0);
+        }
+        return typedIndicator.get();
+    }
+
+    private void setIndicatorValue(final int value) {
+        if (legacyIndicator != null) {
+            legacyIndicator.setValue(0, value);
+        } else {
+            typedIndicator.set(value);
+        }
+    }
+
     @Override
     public double proposal() {
-        final int oldK = indicator.getValue(0);
+        final int oldK = indicatorValue();
         if (!(oldK == 0 || oldK == 1)) {
             return Double.NEGATIVE_INFINITY;
         }
@@ -78,7 +108,7 @@ public class IndicatorGibbsOperator extends Operator {
         // Sample new indicator
         final double u = Randomizer.nextDouble();
         final int newK = (u < Math.exp(logP1)) ? 1 : 0;
-        indicator.setValue(0, newK);
+        setIndicatorValue(newK);
 
         // Hastings ratio for Gibbs:
         // logHR = log q(old|new) - log q(new|old) = logP(old) - logP(new)

@@ -6,6 +6,7 @@ import beast.base.evolution.tree.Node;
 import beast.base.evolution.tree.Tree;
 import beast.base.inference.Operator;
 import beast.base.inference.parameter.RealParameter;
+import beast.base.spec.inference.parameter.RealVectorParam;
 import beast.base.util.Randomizer;
 import mixture.beast.evolution.util.BranchRateIndexHelper;
 
@@ -19,8 +20,14 @@ public class SubtreeRateScaleOperator extends Operator {
 
     public final Input<RealParameter> ratesInput = new Input<>(
             "rates",
-            "positive branch rates for NON-root nodes; dimension=(tree.nodeCount - 1)",
-            Input.Validate.REQUIRED
+            "Legacy positive branch rates for NON-root nodes; dimension=(tree.nodeCount - 1).",
+            Input.Validate.OPTIONAL
+    );
+
+    public final Input<RealVectorParam<?>> ratesVectorInput = new Input<>(
+            "ratesVector",
+            "BEAST3 typed mutable positive branch rates for NON-root nodes; dimension=(tree.nodeCount - 1).",
+            Input.Validate.OPTIONAL
     );
 
     public final Input<Double> windowInput = new Input<>(
@@ -30,20 +37,81 @@ public class SubtreeRateScaleOperator extends Operator {
     );
 
     private Tree tree;
-    private RealParameter rates;
+    private RealParameter legacyRates;
+    private RealVectorParam<?> typedRates;
     private BranchRateIndexHelper.Mapping mapping;
 
     @Override
     public void initAndValidate() {
         tree = treeInput.get();
-        rates = ratesInput.get();
+        legacyRates = ratesInput.get();
+        typedRates = ratesVectorInput.get();
 
-        BranchRateIndexHelper.validateRatesDimension(tree, rates, "SubtreeRateScaleOperator");
+        if (legacyRates == null && typedRates == null) {
+            throw new IllegalArgumentException("SubtreeRateScaleOperator: either rates or ratesVector must be specified.");
+        }
+        if (legacyRates != null && typedRates != null) {
+            throw new IllegalArgumentException("SubtreeRateScaleOperator: specify only one of rates or ratesVector.");
+        }
+        validateOrExpandRatesDimension();
         mapping = BranchRateIndexHelper.buildDeterministic(tree);
     }
 
     private void ensureMappingUpToDate() {
-        mapping = BranchRateIndexHelper.ensureUpToDate(tree, mapping, rates, "SubtreeRateScaleOperator");
+        validateOrExpandRatesDimension();
+        if (mapping == null || !mapping.matches(tree)) {
+            mapping = BranchRateIndexHelper.buildDeterministic(tree);
+        }
+    }
+
+    private int expectedRateDimension() {
+        return tree.getNodeCount() - 1;
+    }
+
+    private int rateDimension() {
+        return legacyRates != null ? legacyRates.getDimension() : typedRates.size();
+    }
+
+    private double rateValue(final int i) {
+        return legacyRates != null ? legacyRates.getValue(i) : typedRates.get(i);
+    }
+
+    private void setRateValue(final int i, final double value) {
+        if (legacyRates != null) {
+            legacyRates.setValue(i, value);
+        } else {
+            typedRates.set(i, value);
+        }
+    }
+
+    private void validateOrExpandRatesDimension() {
+        if (legacyRates != null) {
+            BranchRateIndexHelper.validateRatesDimension(tree, legacyRates, "SubtreeRateScaleOperator");
+            return;
+        }
+
+        final int expected = expectedRateDimension();
+        if (expected < 1) {
+            throw new IllegalArgumentException("SubtreeRateScaleOperator: tree must contain at least one non-root branch. "
+                    + "Found nodeCount=" + tree.getNodeCount());
+        }
+
+        final int observed = rateDimension();
+        if (observed == expected) {
+            return;
+        }
+        if (observed == 1) {
+            final double initialValue = typedRates.get(0);
+            typedRates.setDimension(expected);
+            for (int i = 0; i < expected; i++) {
+                typedRates.set(i, initialValue);
+            }
+            return;
+        }
+
+        throw new IllegalArgumentException("SubtreeRateScaleOperator: ratesVector must have dimension (nodeCount - 1). Found "
+                + observed + " vs " + expected
+                + ". Initialise typed shared rates as a scalar so they can be expanded automatically.");
     }
 
     @Override
@@ -78,12 +146,12 @@ public class SubtreeRateScaleOperator extends Operator {
                     return Double.NEGATIVE_INFINITY;
                 }
 
-                final double r = rates.getValue(idx);
+                final double r = rateValue(idx);
                 final double rNew = r * m;
                 if (!(rNew > 0.0) || Double.isInfinite(rNew) || Double.isNaN(rNew)) {
                     return Double.NEGATIVE_INFINITY;
                 }
-                rates.setValue(idx, rNew);
+                setRateValue(idx, rNew);
                 count++;
             }
 

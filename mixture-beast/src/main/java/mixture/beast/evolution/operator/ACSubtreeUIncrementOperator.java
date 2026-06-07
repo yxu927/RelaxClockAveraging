@@ -7,6 +7,9 @@ import beast.base.evolution.tree.Tree;
 import beast.base.inference.Operator;
 import beast.base.inference.parameter.IntegerParameter;
 import beast.base.inference.parameter.RealParameter;
+import beast.base.spec.inference.parameter.IntScalarParam;
+import beast.base.spec.inference.parameter.RealScalarParam;
+import beast.base.spec.inference.parameter.RealVectorParam;
 import beast.base.util.Randomizer;
 import mixture.beast.evolution.util.BranchRateIndexHelper;
 
@@ -19,11 +22,39 @@ import java.util.List;
 public class ACSubtreeUIncrementOperator extends Operator {
 
     public final Input<Tree> treeInput = new Input<>("tree", "tree", Input.Validate.REQUIRED);
-    public final Input<RealParameter> ratesInput = new Input<>("rates", "shared positive branch rates (non-root nodes)", Input.Validate.REQUIRED);
-    public final Input<IntegerParameter> indicatorInput = new Input<>("indicator", "0=UC, 1=AC", Input.Validate.REQUIRED);
+    public final Input<RealParameter> ratesInput = new Input<>(
+            "rates",
+            "Legacy shared positive branch rates (non-root nodes).",
+            Input.Validate.OPTIONAL);
+    public final Input<RealVectorParam<?>> ratesVectorInput = new Input<>(
+            "ratesVector",
+            "BEAST3 typed mutable shared positive branch rates (non-root nodes).",
+            Input.Validate.OPTIONAL);
+    public final Input<IntegerParameter> indicatorInput = new Input<>(
+            "indicator",
+            "Legacy scalar indicator; 0=UC, 1=AC.",
+            Input.Validate.OPTIONAL);
+    public final Input<IntScalarParam<?>> indicatorScalarInput = new Input<>(
+            "indicatorScalar",
+            "BEAST3 typed mutable scalar indicator; 0=UC, 1=AC.",
+            Input.Validate.OPTIONAL);
 
-    public final Input<RealParameter> sigma2Input = new Input<>("sigma2", "AC Brownian variance per unit time", Input.Validate.REQUIRED);
-    public final Input<RealParameter> rootLogRateInput = new Input<>("rootLogRate", "optional root log-rate anchor (default 0)", Input.Validate.OPTIONAL);
+    public final Input<RealParameter> sigma2Input = new Input<>(
+            "sigma2",
+            "Legacy AC Brownian variance per unit time.",
+            Input.Validate.OPTIONAL);
+    public final Input<RealScalarParam<?>> sigma2ScalarInput = new Input<>(
+            "sigma2Scalar",
+            "BEAST3 typed mutable AC Brownian variance per unit time.",
+            Input.Validate.OPTIONAL);
+    public final Input<RealParameter> rootLogRateInput = new Input<>(
+            "rootLogRate",
+            "Legacy optional root log-rate anchor (default 0).",
+            Input.Validate.OPTIONAL);
+    public final Input<RealScalarParam<?>> rootLogRateScalarInput = new Input<>(
+            "rootLogRateScalar",
+            "BEAST3 typed optional root log-rate anchor (default 0).",
+            Input.Validate.OPTIONAL);
 
     public final Input<Double> minBranchLengthInput = new Input<>("minBranchLength", "min dt allowed", 1e-12);
 
@@ -39,41 +70,113 @@ public class ACSubtreeUIncrementOperator extends Operator {
     public final Input<Boolean> rejectIfNotACInput = new Input<>("rejectIfNotAC", "reject move when indicator!=1", true);
 
     private Tree tree;
-    private RealParameter rates;
-    private IntegerParameter indicator;
-    private RealParameter sigma2;
-    private RealParameter rootLogRate;
+    private RealParameter legacyRates;
+    private RealVectorParam<?> typedRates;
+    private IntegerParameter legacyIndicator;
+    private IntScalarParam<?> typedIndicator;
+    private RealParameter legacySigma2;
+    private RealScalarParam<?> typedSigma2;
+    private RealParameter legacyRootLogRate;
+    private RealScalarParam<?> typedRootLogRate;
 
     private BranchRateIndexHelper.Mapping mapping;
 
     @Override
     public void initAndValidate() {
         tree = treeInput.get();
-        rates = ratesInput.get();
-        indicator = indicatorInput.get();
-        sigma2 = sigma2Input.get();
-        rootLogRate = rootLogRateInput.get();
+        legacyRates = ratesInput.get();
+        typedRates = ratesVectorInput.get();
+        legacyIndicator = indicatorInput.get();
+        typedIndicator = indicatorScalarInput.get();
+        legacySigma2 = sigma2Input.get();
+        typedSigma2 = sigma2ScalarInput.get();
+        legacyRootLogRate = rootLogRateInput.get();
+        typedRootLogRate = rootLogRateScalarInput.get();
 
-        if (indicator.getDimension() != 1) {
-            throw new IllegalArgumentException("indicator dimension must be 1");
+        requireExactlyOne(legacyRates, typedRates, "rates", "ratesVector");
+        requireExactlyOne(legacyIndicator, typedIndicator, "indicator", "indicatorScalar");
+        requireExactlyOne(legacySigma2, typedSigma2, "sigma2", "sigma2Scalar");
+        requireAtMostOne(legacyRootLogRate, typedRootLogRate, "rootLogRate", "rootLogRateScalar");
+
+        if (legacyIndicator != null && legacyIndicator.getDimension() != 1) {
+            throw new IllegalArgumentException("ACSubtreeUIncrementOperator: indicator dimension must be 1");
         }
-        if (sigma2.getDimension() != 1) {
-            throw new IllegalArgumentException("sigma2 dimension must be 1");
+        if (legacySigma2 != null && legacySigma2.getDimension() != 1) {
+            throw new IllegalArgumentException("ACSubtreeUIncrementOperator: sigma2 dimension must be 1");
         }
-        if (rootLogRate != null && rootLogRate.getDimension() != 1) {
-            throw new IllegalArgumentException("rootLogRate dimension must be 1");
+        if (legacyRootLogRate != null && legacyRootLogRate.getDimension() != 1) {
+            throw new IllegalArgumentException("ACSubtreeUIncrementOperator: rootLogRate dimension must be 1");
         }
 
-        BranchRateIndexHelper.validateRatesDimension(tree, rates, "ACSubtreeUIncrementOperator");
+        validateOrExpandRatesDimension();
         mapping = BranchRateIndexHelper.buildDeterministic(tree);
     }
 
+    private static void requireExactlyOne(final Object legacy,
+                                          final Object typed,
+                                          final String legacyName,
+                                          final String typedName) {
+        if (legacy == null && typed == null) {
+            throw new IllegalArgumentException("ACSubtreeUIncrementOperator: either "
+                    + legacyName + " or " + typedName + " must be specified.");
+        }
+        requireAtMostOne(legacy, typed, legacyName, typedName);
+    }
+
+    private static void requireAtMostOne(final Object legacy,
+                                         final Object typed,
+                                         final String legacyName,
+                                         final String typedName) {
+        if (legacy != null && typed != null) {
+            throw new IllegalArgumentException("ACSubtreeUIncrementOperator: specify only one of "
+                    + legacyName + " or " + typedName + ".");
+        }
+    }
+
     private void ensureMappingUpToDate() {
-        mapping = BranchRateIndexHelper.ensureUpToDate(tree, mapping, rates, "ACSubtreeUIncrementOperator");
+        if (legacyRates != null) {
+            mapping = BranchRateIndexHelper.ensureUpToDate(tree, mapping, legacyRates, "ACSubtreeUIncrementOperator");
+        } else {
+            mapping = BranchRateIndexHelper.ensureUpToDate(tree, mapping, typedRates, "ACSubtreeUIncrementOperator");
+        }
+    }
+
+    private void validateOrExpandRatesDimension() {
+        if (legacyRates != null) {
+            BranchRateIndexHelper.validateRatesDimension(tree, legacyRates, "ACSubtreeUIncrementOperator");
+        } else {
+            BranchRateIndexHelper.validateRatesDimension(tree, typedRates, "ACSubtreeUIncrementOperator");
+        }
+    }
+
+    private double rateValue(final int i) {
+        return legacyRates != null ? legacyRates.getValue(i) : typedRates.get(i);
+    }
+
+    private void setRateValue(final int i, final double value) {
+        if (legacyRates != null) {
+            legacyRates.setValue(i, value);
+        } else {
+            typedRates.set(i, value);
+        }
+    }
+
+    private int indicatorValue() {
+        return legacyIndicator != null ? legacyIndicator.getValue(0) : typedIndicator.get();
+    }
+
+    private double sigma2Value() {
+        return legacySigma2 != null ? legacySigma2.getValue(0) : typedSigma2.get();
     }
 
     private double rootLog() {
-        return (rootLogRate == null ? 0.0 : rootLogRate.getValue(0));
+        if (legacyRootLogRate != null) {
+            return legacyRootLogRate.getValue(0);
+        }
+        if (typedRootLogRate != null) {
+            return typedRootLogRate.get();
+        }
+        return 0.0;
     }
 
     /** Collect all non-root nodes (edges) in the subtree under node 'n'. */
@@ -142,7 +245,7 @@ public class ACSubtreeUIncrementOperator extends Operator {
             throw new ArithmeticException("var<=0");
         }
 
-        final double r = rates.getValue(idx);
+        final double r = rateValue(idx);
         if (!(r > 0.0)) {
             throw new ArithmeticException("rate<=0");
         }
@@ -197,12 +300,12 @@ public class ACSubtreeUIncrementOperator extends Operator {
     public double proposal() {
         ensureMappingUpToDate();
 
-        final int k = indicator.getValue(0);
+        final int k = indicatorValue();
         if (k != 1) {
             return rejectIfNotACInput.get() ? Double.NEGATIVE_INFINITY : 0.0;
         }
 
-        final double sig2Value = sigma2.getValue(0);
+        final double sig2Value = sigma2Value();
         final double minDt = minBranchLengthInput.get();
         final double delta = deltaInput.get();
         if (!(sig2Value > 0.0) || !(minDt > 0.0) || !(delta > 0.0)) {
@@ -248,7 +351,7 @@ public class ACSubtreeUIncrementOperator extends Operator {
                     return Double.NEGATIVE_INFINITY;
                 }
 
-                final double rPar = rates.getValue(idxPar);
+                final double rPar = rateValue(idxPar);
                 if (!(rPar > 0.0)) {
                     return Double.NEGATIVE_INFINITY;
                 }
@@ -296,10 +399,12 @@ public class ACSubtreeUIncrementOperator extends Operator {
             sumDelta += (xn - xo);
         }
 
-        rates.startEditing(this);
+        if (legacyRates != null) {
+            legacyRates.startEditing(this);
+        }
         for (final Node e : edges) {
             final int idx = mapping.idxForNode(e);
-            rates.setValue(idx, Math.exp(xNewByNr[e.getNr()]));
+            setRateValue(idx, Math.exp(xNewByNr[e.getNr()]));
         }
 
         return sumDelta;
