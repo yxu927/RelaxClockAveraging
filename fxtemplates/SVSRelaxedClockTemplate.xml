@@ -1,30 +1,12 @@
 <beast version='2.0'
     namespace='beastfx.app.beauti:beastfx.app.inputeditor:beast.pkgmgmt:beast.base.core:beast.base.inference:beast.base.inference.parameter:beast.base.inference.distribution:beast.base.inference.operator:beast.base.inference.operator.kernel:beast.base.evolution.branchratemodel:beast.base.evolution.tree:beast.base.evolution.operator:beast.base.evolution.operator.kernel:mixture.beast.evolution.mixture:mixture.beast.evolution.operator'>
 
-    <!-- Legacy Prior editor support.
-         BEAUti 3 still uses the deprecated Prior + ParametricDistribution editor
-         for <prior> wrappers. Register LogNormalDistributionModel so existing
-         SVS hyperparameter priors show a selected distribution in the Priors tab.
-    -->
-    <mergewith point='parametricDistributions'>
-        <subtemplate id='LogNormalDistributionModel'
-            class='beast.base.inference.distribution.LogNormalDistributionModel'
-            mainid='[top]'>
-            <![CDATA[
-            <distr spec="beast.base.inference.distribution.LogNormalDistributionModel">
-                <parameter name="M" spec="parameter.RealParameter" estimate="false">0.0</parameter>
-                <parameter name="S" spec="parameter.RealParameter" estimate="false" lower="0.0">1.0</parameter>
-            </distr>
-]]>
-        </subtemplate>
-    </mergewith>
-
     <!-- Clock models -->
     <mergewith point='clockModelTemplates'>
 
         <!-- SVS relaxed clock (SharedRatesClockModel + RelaxedRatesPriorSVS).
-             The template uses meanRate, leaves the mean-rate input visible in BEAUti,
-             and uses <prior> tags so the Priors tab recognises distribution types.
+             The template uses BEAST3 typed/spec parameters and scalar priors so
+             the Priors tab uses the standard BEAUti 3 distribution editor.
         -->
         <subtemplate id='SVSRelaxedClockMixture'
             class='mixture.beast.evolution.mixture.SharedRatesClockModelSpec'
@@ -54,60 +36,66 @@
 '>
 
             <![CDATA[
-            <!-- Parameters (created BEFORE use, to keep BEAUti happy) -->
+            <!-- Typed parameters (created BEFORE use, to keep BEAUti happy) -->
 
             <!-- Mean clock rate parameter (used by the clock model via meanRate) -->
             <parameter id="SVSclockRateMix.c:$(n)"
-                spec="beast.base.inference.parameter.RealParameter"
+                spec="beast.base.spec.inference.parameter.RealScalarParam"
                 estimate="true"
-                lower="0.0">0.036</parameter>
+                domain="PositiveReal"
+                value="0.036"/>
 
             <parameter id="SVSsigma2Mix.c:$(n)"
-                spec="beast.base.inference.parameter.RealParameter"
+                spec="beast.base.spec.inference.parameter.RealScalarParam"
                 estimate="true"
-                lower="0.0">0.053</parameter>
+                domain="PositiveReal"
+                value="0.053"/>
 
             <parameter id="SVSsigmaUCLNMix.c:$(n)"
-                spec="beast.base.inference.parameter.RealParameter"
+                spec="beast.base.spec.inference.parameter.RealScalarParam"
                 estimate="true"
-                lower="0.0">0.344</parameter>
+                domain="PositiveReal"
+                value="0.344"/>
 
             <!-- Raw (relative) branch rates.
                  Leave dimension unspecified so the clock model can initialise it from the tree. -->
             <parameter id="SVSrawRatesMix.c:$(n)"
-                spec="beast.base.inference.parameter.RealParameter"
+                spec="beast.base.spec.inference.parameter.RealVectorParam"
                 estimate="true"
-                lower="0.0">1.0</parameter>
+                domain="PositiveReal"
+                value="1.0"/>
 
             <!-- SVS indicator (0/1). The example analyses use a scalar indicator. -->
             <parameter id="SVSindicatorMix.c:$(n)"
-                spec="beast.base.inference.parameter.IntegerParameter"
+                spec="beast.base.spec.inference.parameter.IntScalarParam"
                 estimate="true"
-                lower="0"
-                upper="1">1</parameter>
+                domain="Int"
+                value="1"/>
 
 
             <!-- Main clock model -->
             <branchRateModel id="SVSRelaxedClockMix.c:$(n)"
                 spec="mixture.beast.evolution.mixture.SharedRatesClockModelSpec"
                 tree="@Tree.t:$(n)"
-                rates="@SVSrawRatesMix.c:$(n)"
-                meanRate="@SVSclockRateMix.c:$(n)"
+                ratesVector="@SVSrawRatesMix.c:$(n)"
+                meanRateScalar="@SVSclockRateMix.c:$(n)"
                 normalize="true"/>
 
 
             <!-- SVS prior on raw branch rates -->
             <distribution id="SVSRelaxedClockMixPriorMix.c:$(n)"
                 spec="mixture.beast.evolution.mixture.RelaxedRatesPriorSVS"
-                indicator="@SVSindicatorMix.c:$(n)"
-                rates="@SVSrawRatesMix.c:$(n)"
-                sigma2="@SVSsigma2Mix.c:$(n)"
+                indicatorScalar="@SVSindicatorMix.c:$(n)"
+                ratesVector="@SVSrawRatesMix.c:$(n)"
+                sigma2Scalar="@SVSsigma2Mix.c:$(n)"
                 tree="@Tree.t:$(n)"
-                ucldStdev="@SVSsigmaUCLNMix.c:$(n)">
+                ucldStdevScalar="@SVSsigmaUCLNMix.c:$(n)">
                 <parameter id="SVSrootLogRate.c:$(n)"
-                    spec="beast.base.inference.parameter.RealParameter"
-                    name="rootLogRate"
-                    estimate="false">0.0</parameter>
+                    spec="beast.base.spec.inference.parameter.RealScalarParam"
+                    name="rootLogRateScalar"
+                    domain="Real"
+                    estimate="false"
+                    value="0.0"/>
             </distribution>
 
 
@@ -116,32 +104,32 @@
             <!-- Negative M is valid when meanInRealSpace is FALSE (default).
                  So we omit meanInRealSpace here. -->
 
-            <prior id="SVSclockRateMix.prior.c:$(n)" name="distribution" x="@SVSclockRateMix.c:$(n)">
-                <distr spec="beast.base.inference.distribution.LogNormalDistributionModel">
-                    <parameter name="M" estimate="false">-5.0</parameter>
-                    <parameter name="S" estimate="false">0.5</parameter>
-                </distr>
-            </prior>
+            <distribution id="SVSclockRateMix.prior.c:$(n)"
+                spec="beast.base.spec.inference.distribution.LogNormal"
+                param="@SVSclockRateMix.c:$(n)">
+                <M spec="beast.base.spec.inference.parameter.RealScalarParam" domain="Real" value="-5.0" estimate="false"/>
+                <S spec="beast.base.spec.inference.parameter.RealScalarParam" domain="PositiveReal" value="0.5" estimate="false"/>
+            </distribution>
 
-            <prior id="SVSsigma2Mix.prior.c:$(n)" name="distribution" x="@SVSsigma2Mix.c:$(n)">
-                <distr spec="beast.base.inference.distribution.LogNormalDistributionModel">
-                    <parameter name="M" estimate="false">-4.0</parameter>
-                    <parameter name="S" estimate="false">1.0</parameter>
-                </distr>
-            </prior>
+            <distribution id="SVSsigma2Mix.prior.c:$(n)"
+                spec="beast.base.spec.inference.distribution.LogNormal"
+                param="@SVSsigma2Mix.c:$(n)">
+                <M spec="beast.base.spec.inference.parameter.RealScalarParam" domain="Real" value="-4.0" estimate="false"/>
+                <S spec="beast.base.spec.inference.parameter.RealScalarParam" domain="PositiveReal" value="1.0" estimate="false"/>
+            </distribution>
 
-            <prior id="SVSsigmaUCLNMix.prior.c:$(n)" name="distribution" x="@SVSsigmaUCLNMix.c:$(n)">
-                <distr spec="beast.base.inference.distribution.LogNormalDistributionModel">
-                    <parameter name="M" estimate="false">-1.1</parameter>
-                    <parameter name="S" estimate="false">0.6</parameter>
-                </distr>
-            </prior>
+            <distribution id="SVSsigmaUCLNMix.prior.c:$(n)"
+                spec="beast.base.spec.inference.distribution.LogNormal"
+                param="@SVSsigmaUCLNMix.c:$(n)">
+                <M spec="beast.base.spec.inference.parameter.RealScalarParam" domain="Real" value="-1.1" estimate="false"/>
+                <S spec="beast.base.spec.inference.parameter.RealScalarParam" domain="PositiveReal" value="0.6" estimate="false"/>
+            </distribution>
 
 
             <!-- Operators -->
 
             <operator id="SVSclockRateMix.scale.c:$(n)"
-                spec="beast.base.evolution.operator.kernel.BactrianScaleOperator"
+                spec="beast.base.spec.inference.operator.ScaleOperator"
                 parameter="@SVSclockRateMix.c:$(n)"
                 upper="10.0"
                 weight="1.0"/>
@@ -155,41 +143,42 @@
             </operator>
 
             <operator id="SVSsigma2Mix.scale.c:$(n)"
-                spec="beast.base.evolution.operator.kernel.BactrianScaleOperator"
+                spec="beast.base.spec.inference.operator.ScaleOperator"
                 parameter="@SVSsigma2Mix.c:$(n)"
                 upper="10.0"
                 weight="1.0"/>
 
             <operator id="SVSsigmaUCLNMix.scale.c:$(n)"
-                spec="beast.base.evolution.operator.kernel.BactrianScaleOperator"
+                spec="beast.base.spec.inference.operator.ScaleOperator"
                 parameter="@SVSsigmaUCLNMix.c:$(n)"
                 upper="10.0"
                 weight="1.0"/>
 
             <operator id="SVSrawRatesMix.oneScale.c:$(n)"
                 spec="mixture.beast.evolution.operator.SingleRateScaleOperator"
-                rates="@SVSrawRatesMix.c:$(n)"
+                ratesVector="@SVSrawRatesMix.c:$(n)"
                 weight="15.0"/>
 
             <operator id="SVSrawRatesMix.subtreeScale.c:$(n)"
                 spec="mixture.beast.evolution.operator.SubtreeRateScaleOperator"
-                rates="@SVSrawRatesMix.c:$(n)"
+                ratesVector="@SVSrawRatesMix.c:$(n)"
                 tree="@Tree.t:$(n)"
                 weight="10.0"
                 window="0.25"/>
 
             <operator id="SVSindicatorMix.gibbs.c:$(n)"
                 spec="mixture.beast.evolution.operator.IndicatorGibbsOperator"
-                indicator="@SVSindicatorMix.c:$(n)"
+                indicatorScalar="@SVSindicatorMix.c:$(n)"
                 prior="@SVSRelaxedClockMixPriorMix.c:$(n)"
                 weight="2.0"/>
 
             <operator id="SVSacSubtreeU.c:$(n)"
                 spec="mixture.beast.evolution.operator.ACSubtreeUIncrementOperator"
                 tree="@Tree.t:$(n)"
-                rates="@SVSrawRatesMix.c:$(n)"
-                indicator="@SVSindicatorMix.c:$(n)"
-                sigma2="@SVSsigma2Mix.c:$(n)"
+                ratesVector="@SVSrawRatesMix.c:$(n)"
+                indicatorScalar="@SVSindicatorMix.c:$(n)"
+                sigma2Scalar="@SVSsigma2Mix.c:$(n)"
+                rootLogRateScalar="@SVSrootLogRate.c:$(n)"
                 minBranchLength="1e-12"
                 delta="0.25"
                 internalOnly="true"
@@ -200,9 +189,9 @@
 
             <operator id="SVSucldSigmaNC.c:$(n)"
                 spec="mixture.beast.evolution.operator.UCLDStdevNonCenteredOperator"
-                rates="@SVSrawRatesMix.c:$(n)"
-                indicator="@SVSindicatorMix.c:$(n)"
-                ucldStdev="@SVSsigmaUCLNMix.c:$(n)"
+                ratesVector="@SVSrawRatesMix.c:$(n)"
+                indicatorScalar="@SVSindicatorMix.c:$(n)"
+                ucldStdevScalar="@SVSsigmaUCLNMix.c:$(n)"
                 window="0.20"
                 rejectIfNotUC="true"
                 weight="15.0"/>
@@ -210,9 +199,10 @@
             <operator id="SVSacSigma2NC.c:$(n)"
                 spec="mixture.beast.evolution.operator.ACSigma2NonCenteredOperator"
                 tree="@Tree.t:$(n)"
-                rates="@SVSrawRatesMix.c:$(n)"
-                indicator="@SVSindicatorMix.c:$(n)"
-                sigma2="@SVSsigma2Mix.c:$(n)"
+                ratesVector="@SVSrawRatesMix.c:$(n)"
+                indicatorScalar="@SVSindicatorMix.c:$(n)"
+                sigma2Scalar="@SVSsigma2Mix.c:$(n)"
+                rootLogRateScalar="@SVSrootLogRate.c:$(n)"
                 minBranchLength="1e-12"
                 window="0.15"
                 rejectIfNotAC="true"
@@ -221,17 +211,18 @@
             <operator id="SVSucacBridge.c:$(n)"
                 spec="mixture.beast.evolution.operator.UCACSwitchBridgeOperator"
                 tree="@Tree.t:$(n)"
-                rates="@SVSrawRatesMix.c:$(n)"
-                indicator="@SVSindicatorMix.c:$(n)"
-                ucldStdev="@SVSsigmaUCLNMix.c:$(n)"
-                sigma2="@SVSsigma2Mix.c:$(n)"
+                ratesVector="@SVSrawRatesMix.c:$(n)"
+                indicatorScalar="@SVSindicatorMix.c:$(n)"
+                ucldStdevScalar="@SVSsigmaUCLNMix.c:$(n)"
+                sigma2Scalar="@SVSsigma2Mix.c:$(n)"
+                rootLogRateScalar="@SVSrootLogRate.c:$(n)"
                 minBranchLength="1e-12"
                 weight="10.0"/>
 
 
             <!-- Flag operator (weight=0) used to toggle mixture connectors -->
             <operator id="SVSmixtureFlagSVSMix.c:$(n)"
-                spec="ScaleOperator"
+                spec="beast.base.spec.inference.operator.ScaleOperator"
                 parameter="@SVSclockRateMix.c:$(n)"
                 scaleFactor="0.75"
                 weight="0.0"/>
@@ -246,12 +237,12 @@
 
             <!-- Strict clock model for the strict component -->
             <branchRateModel id="MixtureStrictClockSVSMix.$(n)"
-                spec="beast.base.evolution.branchratemodel.StrictClockModel"
+                spec="beast.base.spec.evolution.branchratemodel.StrictClockModel"
                 clock.rate="@SVSclockRateMix.c:$(n)"/>
 
             <!-- Strict component tree likelihood -->
             <distribution id="treeLikelihoodStrictSVSMix.$(n)"
-                spec="beast.base.evolution.likelihood.ThreadedTreeLikelihood"
+                spec="beast.base.spec.evolution.likelihood.ThreadedTreeLikelihood"
                 data="@$(n)"
                 tree="@Tree.t:$(n)"
                 useAmbiguities="true">
@@ -269,10 +260,12 @@
                 <subLikelihood idref="treeLikelihoodStrictSVSMix.$(n)"/>
                 <subLikelihood idref="treeLikelihood.$(n)"/>
                 <parameter id="w_topSVSMix.$(n)"
-                    spec="beast.base.inference.parameter.RealParameter"
+                    spec="beast.base.spec.inference.parameter.RealVectorParam"
+                    domain="Real"
                     dimension="2"
                     estimate="false"
-                    name="weights">0.3333333333333333 0.6666666666666666</parameter>
+                    name="weightsVector"
+                    value="0.3333333333333333 0.6666666666666666"/>
             </distribution>
 
             <!-- Optional mixture diagnostics, matching the legacy-style XML example. -->
