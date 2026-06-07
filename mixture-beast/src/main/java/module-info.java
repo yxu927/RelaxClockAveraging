@@ -13,6 +13,7 @@ open module mixture.beast {
         mixture.beast.evolution.mixture.MixtureTreeLikelihood,
         mixture.beast.evolution.mixture.RelaxedRatesPriorSVS,
         mixture.beast.evolution.mixture.SharedRatesClockModel,
+        mixture.beast.evolution.mixture.SharedRatesClockModelSpec,
         mixture.beast.evolution.operator.ACSigma2NonCenteredOperator,
         mixture.beast.evolution.operator.ACSubtreeUIncrementOperator,
         mixture.beast.evolution.operator.AlphaAnnealingOperator,

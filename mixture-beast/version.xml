@@ -8,6 +8,7 @@
         <provider classname="mixture.beast.evolution.mixture.MixtureTreeLikelihood"/>
         <provider classname="mixture.beast.evolution.mixture.RelaxedRatesPriorSVS"/>
         <provider classname="mixture.beast.evolution.mixture.SharedRatesClockModel"/>
+        <provider classname="mixture.beast.evolution.mixture.SharedRatesClockModelSpec"/>
         <provider classname="mixture.beast.evolution.operator.ACSigma2NonCenteredOperator"/>
         <provider classname="mixture.beast.evolution.operator.ACSubtreeUIncrementOperator"/>
         <provider classname="mixture.beast.evolution.operator.AlphaAnnealingOperator"/>

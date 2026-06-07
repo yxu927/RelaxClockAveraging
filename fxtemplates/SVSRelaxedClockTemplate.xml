@@ -9,7 +9,7 @@
              and uses <prior> tags so the Priors tab recognises distribution types.
         -->
         <subtemplate id='SVSRelaxedClockMixture'
-            class='mixture.beast.evolution.mixture.SharedRatesClockModel'
+            class='mixture.beast.evolution.mixture.SharedRatesClockModelSpec'
             mainid='SVSRelaxedClockMix.c:$(n)'
             suppressInputs='
                 mixture.beast.evolution.mixture.SharedRatesClockModel.tree,
@@ -59,7 +59,7 @@
 
             <!-- Main clock model -->
             <branchRateModel id="SVSRelaxedClockMix.c:$(n)"
-                spec="mixture.beast.evolution.mixture.SharedRatesClockModel"
+                spec="mixture.beast.evolution.mixture.SharedRatesClockModelSpec"
                 tree="@Tree.t:$(n)"
                 rates="@SVSrawRatesMix.c:$(n)"
                 meanRate="@SVSclockRateMix.c:$(n)"
