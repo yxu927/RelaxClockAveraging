@@ -222,6 +222,10 @@
         <operator id="psi.wilsonBalding" spec="WilsonBalding" tree="@psi" weight="1.97435048583482" />
         <operator id="rawRates.oneScale.554868511" spec="mixture.beast.evolution.operator.SingleRateScaleOperator" weight="15.0" ratesVector="@rawRates.554868511" />
         <operator id="rawRates.subtreeScale.554868511" spec="mixture.beast.evolution.operator.SubtreeRateScaleOperator" tree="@psi" weight="10.0" window="0.25" ratesVector="@rawRates.554868511" />
+        <operator id="acSubtreeU.554868511" spec="mixture.beast.evolution.operator.ACSubtreeUIncrementOperator" tree="@psi" ratesVector="@rawRates.554868511" indicatorScalar="@i_relax" sigma2Scalar="@sigma2" minBranchLength="1e-12" delta="0.25" internalOnly="true" allowRoot="false" maxSubtreeEdges="80" rejectIfNotAC="true" weight="15.0" />
+        <operator id="ucldSigmaNC.554868511" spec="mixture.beast.evolution.operator.UCLDStdevNonCenteredOperator" ratesVector="@rawRates.554868511" indicatorScalar="@i_relax" ucldStdevScalar="@sigmaUCLN" window="0.20" rejectIfNotUC="true" weight="15.0" />
+        <operator id="acSigma2NC.554868511" spec="mixture.beast.evolution.operator.ACSigma2NonCenteredOperator" tree="@psi" ratesVector="@rawRates.554868511" indicatorScalar="@i_relax" sigma2Scalar="@sigma2" minBranchLength="1e-12" window="0.15" rejectIfNotAC="true" weight="15.0" />
+        <operator id="ucacBridge.554868511" spec="mixture.beast.evolution.operator.UCACSwitchBridgeOperator" tree="@psi" ratesVector="@rawRates.554868511" indicatorScalar="@i_relax" ucldStdevScalar="@sigmaUCLN" sigma2Scalar="@sigma2" minBranchLength="1e-12" weight="10.0" />
         <operator id="sigma2.scale" spec="beast.base.spec.inference.operator.ScaleOperator" parameter="@sigma2" upper="10.0" weight="1.0" />
         <operator id="sigmaUCLN.scale" spec="beast.base.spec.inference.operator.ScaleOperator" parameter="@sigmaUCLN" upper="10.0" weight="1.0" />
         <logger id="ScreenLogger" spec="Logger" logEvery="10000000">

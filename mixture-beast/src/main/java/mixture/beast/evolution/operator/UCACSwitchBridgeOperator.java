@@ -7,6 +7,9 @@ import beast.base.evolution.tree.Tree;
 import beast.base.inference.Operator;
 import beast.base.inference.parameter.IntegerParameter;
 import beast.base.inference.parameter.RealParameter;
+import beast.base.spec.inference.parameter.IntScalarParam;
+import beast.base.spec.inference.parameter.RealScalarParam;
+import beast.base.spec.inference.parameter.RealVectorParam;
 import mixture.beast.evolution.util.BranchRateIndexHelper;
 
 @Description("UC<->AC switch operator that deterministically maps the shared rate vector through "
@@ -15,56 +18,182 @@ import mixture.beast.evolution.util.BranchRateIndexHelper;
 public class UCACSwitchBridgeOperator extends Operator {
 
     public final Input<Tree> treeInput = new Input<>("tree", "tree", Input.Validate.REQUIRED);
-    public final Input<RealParameter> ratesInput = new Input<>("rates", "shared positive branch rates (non-root nodes)", Input.Validate.REQUIRED);
-    public final Input<IntegerParameter> indicatorInput = new Input<>("indicator", "0=UC, 1=AC", Input.Validate.REQUIRED);
+    public final Input<RealParameter> ratesInput = new Input<>(
+            "rates",
+            "Legacy shared positive branch rates (non-root nodes).",
+            Input.Validate.OPTIONAL);
+    public final Input<RealVectorParam<?>> ratesVectorInput = new Input<>(
+            "ratesVector",
+            "BEAST3 typed mutable shared positive branch rates (non-root nodes).",
+            Input.Validate.OPTIONAL);
+    public final Input<IntegerParameter> indicatorInput = new Input<>(
+            "indicator",
+            "Legacy scalar indicator; 0=UC, 1=AC.",
+            Input.Validate.OPTIONAL);
+    public final Input<IntScalarParam<?>> indicatorScalarInput = new Input<>(
+            "indicatorScalar",
+            "BEAST3 typed mutable scalar indicator; 0=UC, 1=AC.",
+            Input.Validate.OPTIONAL);
 
-    public final Input<RealParameter> ucldStdevInput = new Input<>("ucldStdev", "UC lognormal stdev (sigma on log scale)", Input.Validate.REQUIRED);
-    public final Input<RealParameter> sigma2Input = new Input<>("sigma2", "AC Brownian variance per unit time", Input.Validate.REQUIRED);
-    public final Input<RealParameter> rootLogRateInput = new Input<>("rootLogRate", "optional root log-rate anchor (default 0)", Input.Validate.OPTIONAL);
+    public final Input<RealParameter> ucldStdevInput = new Input<>(
+            "ucldStdev",
+            "Legacy UC lognormal stdev (sigma on log scale).",
+            Input.Validate.OPTIONAL);
+    public final Input<RealScalarParam<?>> ucldStdevScalarInput = new Input<>(
+            "ucldStdevScalar",
+            "BEAST3 typed mutable UC lognormal stdev (sigma on log scale).",
+            Input.Validate.OPTIONAL);
+    public final Input<RealParameter> sigma2Input = new Input<>(
+            "sigma2",
+            "Legacy AC Brownian variance per unit time.",
+            Input.Validate.OPTIONAL);
+    public final Input<RealScalarParam<?>> sigma2ScalarInput = new Input<>(
+            "sigma2Scalar",
+            "BEAST3 typed mutable AC Brownian variance per unit time.",
+            Input.Validate.OPTIONAL);
+    public final Input<RealParameter> rootLogRateInput = new Input<>(
+            "rootLogRate",
+            "Legacy optional root log-rate anchor (default 0).",
+            Input.Validate.OPTIONAL);
+    public final Input<RealScalarParam<?>> rootLogRateScalarInput = new Input<>(
+            "rootLogRateScalar",
+            "BEAST3 typed optional root log-rate anchor (default 0).",
+            Input.Validate.OPTIONAL);
 
     public final Input<Double> minBranchLengthInput = new Input<>("minBranchLength", "min dt allowed for AC mapping", 1e-12);
 
     private Tree tree;
-    private RealParameter rates;
-    private IntegerParameter indicator;
-    private RealParameter ucldStdev;
-    private RealParameter sigma2;
-    private RealParameter rootLogRate;
+    private RealParameter legacyRates;
+    private RealVectorParam<?> typedRates;
+    private IntegerParameter legacyIndicator;
+    private IntScalarParam<?> typedIndicator;
+    private RealParameter legacyUcldStdev;
+    private RealScalarParam<?> typedUcldStdev;
+    private RealParameter legacySigma2;
+    private RealScalarParam<?> typedSigma2;
+    private RealParameter legacyRootLogRate;
+    private RealScalarParam<?> typedRootLogRate;
 
     private BranchRateIndexHelper.Mapping mapping;
 
     @Override
     public void initAndValidate() {
         tree = treeInput.get();
-        rates = ratesInput.get();
-        indicator = indicatorInput.get();
-        ucldStdev = ucldStdevInput.get();
-        sigma2 = sigma2Input.get();
-        rootLogRate = rootLogRateInput.get();
+        legacyRates = ratesInput.get();
+        typedRates = ratesVectorInput.get();
+        legacyIndicator = indicatorInput.get();
+        typedIndicator = indicatorScalarInput.get();
+        legacyUcldStdev = ucldStdevInput.get();
+        typedUcldStdev = ucldStdevScalarInput.get();
+        legacySigma2 = sigma2Input.get();
+        typedSigma2 = sigma2ScalarInput.get();
+        legacyRootLogRate = rootLogRateInput.get();
+        typedRootLogRate = rootLogRateScalarInput.get();
 
-        if (indicator.getDimension() != 1) {
-            throw new IllegalArgumentException("indicator dimension must be 1");
+        requireExactlyOne(legacyRates, typedRates, "rates", "ratesVector");
+        requireExactlyOne(legacyIndicator, typedIndicator, "indicator", "indicatorScalar");
+        requireExactlyOne(legacyUcldStdev, typedUcldStdev, "ucldStdev", "ucldStdevScalar");
+        requireExactlyOne(legacySigma2, typedSigma2, "sigma2", "sigma2Scalar");
+        requireAtMostOne(legacyRootLogRate, typedRootLogRate, "rootLogRate", "rootLogRateScalar");
+
+        if (legacyIndicator != null && legacyIndicator.getDimension() != 1) {
+            throw new IllegalArgumentException("UCACSwitchBridgeOperator: indicator dimension must be 1");
         }
-        if (ucldStdev.getDimension() != 1) {
-            throw new IllegalArgumentException("ucldStdev dimension must be 1");
+        if (legacyUcldStdev != null && legacyUcldStdev.getDimension() != 1) {
+            throw new IllegalArgumentException("UCACSwitchBridgeOperator: ucldStdev dimension must be 1");
         }
-        if (sigma2.getDimension() != 1) {
-            throw new IllegalArgumentException("sigma2 dimension must be 1");
+        if (legacySigma2 != null && legacySigma2.getDimension() != 1) {
+            throw new IllegalArgumentException("UCACSwitchBridgeOperator: sigma2 dimension must be 1");
         }
-        if (rootLogRate != null && rootLogRate.getDimension() != 1) {
-            throw new IllegalArgumentException("rootLogRate dimension must be 1");
+        if (legacyRootLogRate != null && legacyRootLogRate.getDimension() != 1) {
+            throw new IllegalArgumentException("UCACSwitchBridgeOperator: rootLogRate dimension must be 1");
         }
 
-        BranchRateIndexHelper.validateRatesDimension(tree, rates, "UCACSwitchBridgeOperator");
+        validateOrExpandRatesDimension();
         mapping = BranchRateIndexHelper.buildDeterministic(tree);
     }
 
+    private static void requireExactlyOne(final Object legacy,
+                                          final Object typed,
+                                          final String legacyName,
+                                          final String typedName) {
+        if (legacy == null && typed == null) {
+            throw new IllegalArgumentException("UCACSwitchBridgeOperator: either "
+                    + legacyName + " or " + typedName + " must be specified.");
+        }
+        requireAtMostOne(legacy, typed, legacyName, typedName);
+    }
+
+    private static void requireAtMostOne(final Object legacy,
+                                         final Object typed,
+                                         final String legacyName,
+                                         final String typedName) {
+        if (legacy != null && typed != null) {
+            throw new IllegalArgumentException("UCACSwitchBridgeOperator: specify only one of "
+                    + legacyName + " or " + typedName + ".");
+        }
+    }
+
     private void ensureMappingUpToDate() {
-        mapping = BranchRateIndexHelper.ensureUpToDate(tree, mapping, rates, "UCACSwitchBridgeOperator");
+        if (legacyRates != null) {
+            mapping = BranchRateIndexHelper.ensureUpToDate(tree, mapping, legacyRates, "UCACSwitchBridgeOperator");
+        } else {
+            mapping = BranchRateIndexHelper.ensureUpToDate(tree, mapping, typedRates, "UCACSwitchBridgeOperator");
+        }
+    }
+
+    private void validateOrExpandRatesDimension() {
+        if (legacyRates != null) {
+            BranchRateIndexHelper.validateRatesDimension(tree, legacyRates, "UCACSwitchBridgeOperator");
+        } else {
+            BranchRateIndexHelper.validateRatesDimension(tree, typedRates, "UCACSwitchBridgeOperator");
+        }
+    }
+
+    private int rateDimension() {
+        return legacyRates != null ? legacyRates.getDimension() : typedRates.size();
+    }
+
+    private double rateValue(final int i) {
+        return legacyRates != null ? legacyRates.getValue(i) : typedRates.get(i);
+    }
+
+    private void setRateValue(final int i, final double value) {
+        if (legacyRates != null) {
+            legacyRates.setValue(i, value);
+        } else {
+            typedRates.set(i, value);
+        }
+    }
+
+    private int indicatorValue() {
+        return legacyIndicator != null ? legacyIndicator.getValue(0) : typedIndicator.get();
+    }
+
+    private void setIndicatorValue(final int value) {
+        if (legacyIndicator != null) {
+            legacyIndicator.setValue(0, value);
+        } else {
+            typedIndicator.set(value);
+        }
+    }
+
+    private double ucldStdevValue() {
+        return legacyUcldStdev != null ? legacyUcldStdev.getValue(0) : typedUcldStdev.get();
+    }
+
+    private double sigma2Value() {
+        return legacySigma2 != null ? legacySigma2.getValue(0) : typedSigma2.get();
     }
 
     private double rootLog() {
-        return (rootLogRate == null ? 0.0 : rootLogRate.getValue(0));
+        if (legacyRootLogRate != null) {
+            return legacyRootLogRate.getValue(0);
+        }
+        if (typedRootLogRate != null) {
+            return typedRootLogRate.get();
+        }
+        return 0.0;
     }
 
     private static final class Sum {
@@ -75,7 +204,7 @@ public class UCACSwitchBridgeOperator extends Operator {
     public double proposal() {
         ensureMappingUpToDate();
 
-        final int k = indicator.getValue(0);
+        final int k = indicatorValue();
         if (k == 0) {
             return proposeUCtoAC();
         } else if (k == 1) {
@@ -85,21 +214,21 @@ public class UCACSwitchBridgeOperator extends Operator {
     }
 
     private double proposeUCtoAC() {
-        final double s = ucldStdev.getValue(0);
-        final double sig2 = sigma2.getValue(0);
+        final double s = ucldStdevValue();
+        final double sig2 = sigma2Value();
         final double minDt = minBranchLengthInput.get();
         if (!(s > 0.0) || !(sig2 > 0.0) || !(minDt > 0.0)) {
             return Double.NEGATIVE_INFINITY;
         }
 
-        final int nEdges = rates.getDimension();
+        final int nEdges = rateDimension();
         final double muUC = -0.5 * s * s;
 
         final double[] xOld = new double[nEdges];
         final double[] u = new double[nEdges];
 
         for (int i = 0; i < nEdges; i++) {
-            final double r = rates.getValue(i);
+            final double r = rateValue(i);
             if (!(r > 0.0)) {
                 return Double.NEGATIVE_INFINITY;
             }
@@ -123,31 +252,35 @@ public class UCACSwitchBridgeOperator extends Operator {
         }
         final double logH = sumDelta + 0.5 * sum.sumLogVar - nEdges * Math.log(s);
 
-        rates.startEditing(this);
+        if (legacyRates != null) {
+            legacyRates.startEditing(this);
+        }
         for (int i = 0; i < nEdges; i++) {
-            rates.setValue(i, Math.exp(xNew[i]));
+            setRateValue(i, Math.exp(xNew[i]));
         }
 
-        indicator.startEditing(this);
-        indicator.setValue(0, 1);
+        if (legacyIndicator != null) {
+            legacyIndicator.startEditing(this);
+        }
+        setIndicatorValue(1);
 
         return logH;
     }
 
     private double proposeACtoUC() {
-        final double s = ucldStdev.getValue(0);
-        final double sig2 = sigma2.getValue(0);
+        final double s = ucldStdevValue();
+        final double sig2 = sigma2Value();
         final double minDt = minBranchLengthInput.get();
         if (!(s > 0.0) || !(sig2 > 0.0) || !(minDt > 0.0)) {
             return Double.NEGATIVE_INFINITY;
         }
 
-        final int nEdges = rates.getDimension();
+        final int nEdges = rateDimension();
         final double muUC = -0.5 * s * s;
 
         final double[] xOld = new double[nEdges];
         for (int i = 0; i < nEdges; i++) {
-            final double r = rates.getValue(i);
+            final double r = rateValue(i);
             if (!(r > 0.0)) {
                 return Double.NEGATIVE_INFINITY;
             }
@@ -174,13 +307,17 @@ public class UCACSwitchBridgeOperator extends Operator {
         }
         final double logH = sumDelta + nEdges * Math.log(s) - 0.5 * sum.sumLogVar;
 
-        rates.startEditing(this);
+        if (legacyRates != null) {
+            legacyRates.startEditing(this);
+        }
         for (int i = 0; i < nEdges; i++) {
-            rates.setValue(i, Math.exp(xNew[i]));
+            setRateValue(i, Math.exp(xNew[i]));
         }
 
-        indicator.startEditing(this);
-        indicator.setValue(0, 0);
+        if (legacyIndicator != null) {
+            legacyIndicator.startEditing(this);
+        }
+        setIndicatorValue(0);
 
         return logH;
     }
