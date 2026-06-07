@@ -302,10 +302,6 @@ public class MixtureLikelihoodLogger extends BEASTObject implements Loggable {
         return legacyWeights != null ? legacyWeights.getArrayValue(k) : typedWeights.get(k);
     }
 
-    private boolean hasAlpha() {
-        return legacyAlpha != null || typedAlpha != null;
-    }
-
     private double alphaValue() {
         if (legacyAlpha != null) {
             return legacyAlpha.getArrayValue(0);

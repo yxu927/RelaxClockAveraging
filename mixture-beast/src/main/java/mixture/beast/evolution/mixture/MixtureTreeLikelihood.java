@@ -124,7 +124,6 @@ public class MixtureTreeLikelihood extends Distribution {
                 sumLogL += li;
             }
 
-            // mixture term uses only wi>0
             if (wi <= 0.0 || !Double.isFinite(li)) {
                 term[i] = Double.NEGATIVE_INFINITY;
                 continue;
@@ -143,7 +142,6 @@ public class MixtureTreeLikelihood extends Distribution {
             return logP;
         }
 
-        // log-sum-exp
         double sumExp = 0.0;
         for (int i = 0; i < K; i++) {
             if (Double.isFinite(term[i])) {

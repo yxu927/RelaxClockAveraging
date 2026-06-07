@@ -114,10 +114,8 @@ public class HierarchicalSVSLogger extends BEASTObject implements Loggable {
         }
 
         if (printInner) {
-
             out.print(p + "logPUC\t");
             out.print(p + "logPAC\t");
-
         }
 
         if (printThree) {

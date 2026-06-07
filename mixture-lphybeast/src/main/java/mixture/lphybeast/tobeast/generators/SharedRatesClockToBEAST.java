@@ -16,7 +16,6 @@ public class SharedRatesClockToBEAST implements GeneratorToBEAST<SharedRatesCloc
     @Override
     public SharedRatesClockModel generatorToBEAST(SharedRatesClock gen, BEASTInterface beastValue, BEASTContext context) {
 
-        // Read LPhy inputs from params map (no need for getters)
         @SuppressWarnings("unchecked")
         Value<TimeTree> treeVal = (Value<TimeTree>) gen.getParams().get(SharedRatesClock.TREE);
 

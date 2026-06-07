@@ -61,7 +61,6 @@ public class CategoricalDistribution extends Distribution {
             return Double.NEGATIVE_INFINITY;
         }
 
-        // Check probabilities and sum-to-one
         double sum = 0.0;
         for (int i = 0; i < K; i++) {
             double pi = pValue(i);

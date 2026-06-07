@@ -64,7 +64,6 @@ public class IndicatorGibbsOperator extends Operator {
     }
 
     private static double logSumExp(double a, double b) {
-        // stable log(exp(a)+exp(b))
         if (a > b) {
             return a + Math.log1p(Math.exp(b - a));
         }
