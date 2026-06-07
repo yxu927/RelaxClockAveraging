@@ -14,10 +14,13 @@
             suppressInputs='
                 mixture.beast.evolution.mixture.SharedRatesClockModel.tree,
                 mixture.beast.evolution.mixture.SharedRatesClockModel.rates,
+                mixture.beast.evolution.mixture.SharedRatesClockModel.meanRate,
+                mixture.beast.evolution.mixture.SharedRatesClockModel.meanRateScalar,
                 mixture.beast.evolution.mixture.SharedRatesClockModel.clock.rate,
                 mixture.beast.evolution.mixture.SharedRatesClockModelSpec.tree,
                 mixture.beast.evolution.mixture.SharedRatesClockModelSpec.rates,
                 mixture.beast.evolution.mixture.SharedRatesClockModelSpec.ratesVector,
+                mixture.beast.evolution.mixture.SharedRatesClockModelSpec.meanRate,
                 mixture.beast.evolution.mixture.SharedRatesClockModelSpec.meanRateScalar,
                 mixture.beast.evolution.mixture.SharedRatesClockModelSpec.clock.rate,
                 beast.base.evolution.branchratemodel.StrictClockModel.clock.rate,
