@@ -1,0 +1,371 @@
+<beast version='2.0'
+    namespace='beastfx.app.beauti:beastfx.app.inputeditor:beast.pkgmgmt:beast.base.core:beast.base.inference:beast.base.inference.parameter:beast.base.inference.distribution:beast.base.inference.operator:beast.base.inference.operator.kernel:beast.base.evolution.branchratemodel:beast.base.evolution.tree:beast.base.evolution.operator:beast.base.evolution.operator.kernel:mixture.beast.evolution.mixture:mixture.beast.evolution.operator'>
+
+    <!-- Clock models -->
+    <mergewith point='clockModelTemplates'>
+
+        <!-- SVS relaxed clock (SharedRatesClockModel + RelaxedRatesPriorSVS).
+             The template uses meanRate, leaves the mean-rate input visible in BEAUti,
+             and uses <prior> tags so the Priors tab recognises distribution types.
+        -->
+        <subtemplate id='SVSRelaxedClockMixture'
+            class='mixture.beast.evolution.mixture.SharedRatesClockModel'
+            mainid='SVSRelaxedClockMix.c:$(n)'
+            suppressInputs='
+                mixture.beast.evolution.mixture.SharedRatesClockModel.tree,
+                mixture.beast.evolution.mixture.SharedRatesClockModel.rates,
+                mixture.beast.evolution.mixture.SharedRatesClockModel.clock.rate,
+                beast.base.evolution.branchratemodel.StrictClockModel.clock.rate,
+                mixture.beast.evolution.mixture.RelaxedRatesPriorSVS.tree,
+                mixture.beast.evolution.mixture.RelaxedRatesPriorSVS.rates,
+                mixture.beast.evolution.mixture.RelaxedRatesPriorSVS.indicator,
+                mixture.beast.evolution.mixture.RelaxedRatesPriorSVS.sigma2,
+                mixture.beast.evolution.mixture.RelaxedRatesPriorSVS.ucldStdev
+'>
+
+            <![CDATA[
+            <!-- Parameters (created BEFORE use, to keep BEAUti happy) -->
+
+            <!-- Mean clock rate parameter (used by the clock model via meanRate) -->
+            <parameter id="SVSclockRateMix.c:$(n)"
+                spec="beast.base.inference.parameter.RealParameter"
+                estimate="true"
+                lower="0.0">0.036</parameter>
+
+            <parameter id="SVSsigma2Mix.c:$(n)"
+                spec="beast.base.inference.parameter.RealParameter"
+                estimate="true"
+                lower="0.0">0.053</parameter>
+
+            <parameter id="SVSsigmaUCLNMix.c:$(n)"
+                spec="beast.base.inference.parameter.RealParameter"
+                estimate="true"
+                lower="0.0">0.344</parameter>
+
+            <!-- Raw (relative) branch rates.
+                 Leave dimension unspecified so the clock model can initialise it from the tree. -->
+            <parameter id="SVSrawRatesMix.c:$(n)"
+                spec="beast.base.inference.parameter.RealParameter"
+                estimate="true"
+                lower="0.0">1.0</parameter>
+
+            <!-- SVS indicator (0/1). The example analyses use a scalar indicator. -->
+            <parameter id="SVSindicatorMix.c:$(n)"
+                spec="beast.base.inference.parameter.IntegerParameter"
+                estimate="true"
+                lower="0"
+                upper="1">1</parameter>
+
+
+            <!-- Main clock model -->
+            <branchRateModel id="SVSRelaxedClockMix.c:$(n)"
+                spec="mixture.beast.evolution.mixture.SharedRatesClockModel"
+                tree="@Tree.t:$(n)"
+                rates="@SVSrawRatesMix.c:$(n)"
+                meanRate="@SVSclockRateMix.c:$(n)"
+                normalize="true"/>
+
+
+            <!-- SVS prior on raw branch rates -->
+            <distribution id="SVSRelaxedClockMixPriorMix.c:$(n)"
+                spec="mixture.beast.evolution.mixture.RelaxedRatesPriorSVS"
+                indicator="@SVSindicatorMix.c:$(n)"
+                rates="@SVSrawRatesMix.c:$(n)"
+                sigma2="@SVSsigma2Mix.c:$(n)"
+                tree="@Tree.t:$(n)"
+                ucldStdev="@SVSsigmaUCLNMix.c:$(n)">
+                <parameter id="SVSrootLogRate.c:$(n)"
+                    spec="beast.base.inference.parameter.RealParameter"
+                    name="rootLogRate"
+                    estimate="false">0.0</parameter>
+            </distribution>
+
+
+            <!-- Priors on hyperparameters -->
+
+            <!-- Negative M is valid when meanInRealSpace is FALSE (default).
+                 So we omit meanInRealSpace here. -->
+
+            <prior id="SVSclockRateMix.prior.c:$(n)" name="distribution" x="@SVSclockRateMix.c:$(n)">
+                <distr spec="beast.base.inference.distribution.LogNormalDistributionModel">
+                    <parameter name="M" estimate="false">-5.0</parameter>
+                    <parameter name="S" estimate="false">0.5</parameter>
+                </distr>
+            </prior>
+
+            <prior id="SVSsigma2Mix.prior.c:$(n)" name="distribution" x="@SVSsigma2Mix.c:$(n)">
+                <distr spec="beast.base.inference.distribution.LogNormalDistributionModel">
+                    <parameter name="M" estimate="false">-4.0</parameter>
+                    <parameter name="S" estimate="false">1.0</parameter>
+                </distr>
+            </prior>
+
+            <prior id="SVSsigmaUCLNMix.prior.c:$(n)" name="distribution" x="@SVSsigmaUCLNMix.c:$(n)">
+                <distr spec="beast.base.inference.distribution.LogNormalDistributionModel">
+                    <parameter name="M" estimate="false">-1.1</parameter>
+                    <parameter name="S" estimate="false">0.6</parameter>
+                </distr>
+            </prior>
+
+
+            <!-- Operators -->
+
+            <operator id="SVSclockRateMix.scale.c:$(n)"
+                spec="beast.base.evolution.operator.kernel.BactrianScaleOperator"
+                parameter="@SVSclockRateMix.c:$(n)"
+                upper="10.0"
+                weight="1.0"/>
+
+            <operator id="SVSclockRateMixUpTreeDown.c:$(n)"
+                spec="beast.base.inference.operator.kernel.BactrianUpDownOperator"
+                scaleFactor="0.9"
+                weight="3.0">
+                <up idref="SVSclockRateMix.c:$(n)"/>
+                <down idref="Tree.t:$(n)"/>
+            </operator>
+
+            <operator id="SVSsigma2Mix.scale.c:$(n)"
+                spec="beast.base.evolution.operator.kernel.BactrianScaleOperator"
+                parameter="@SVSsigma2Mix.c:$(n)"
+                upper="10.0"
+                weight="1.0"/>
+
+            <operator id="SVSsigmaUCLNMix.scale.c:$(n)"
+                spec="beast.base.evolution.operator.kernel.BactrianScaleOperator"
+                parameter="@SVSsigmaUCLNMix.c:$(n)"
+                upper="10.0"
+                weight="1.0"/>
+
+            <operator id="SVSrawRatesMix.oneScale.c:$(n)"
+                spec="mixture.beast.evolution.operator.SingleRateScaleOperator"
+                rates="@SVSrawRatesMix.c:$(n)"
+                weight="15.0"/>
+
+            <operator id="SVSrawRatesMix.subtreeScale.c:$(n)"
+                spec="mixture.beast.evolution.operator.SubtreeRateScaleOperator"
+                rates="@SVSrawRatesMix.c:$(n)"
+                tree="@Tree.t:$(n)"
+                weight="10.0"
+                window="0.25"/>
+
+            <operator id="SVSindicatorMix.gibbs.c:$(n)"
+                spec="mixture.beast.evolution.operator.IndicatorGibbsOperator"
+                indicator="@SVSindicatorMix.c:$(n)"
+                prior="@SVSRelaxedClockMixPriorMix.c:$(n)"
+                weight="2.0"/>
+
+            <operator id="SVSacSubtreeU.c:$(n)"
+                spec="mixture.beast.evolution.operator.ACSubtreeUIncrementOperator"
+                tree="@Tree.t:$(n)"
+                rates="@SVSrawRatesMix.c:$(n)"
+                indicator="@SVSindicatorMix.c:$(n)"
+                sigma2="@SVSsigma2Mix.c:$(n)"
+                minBranchLength="1e-12"
+                delta="0.25"
+                internalOnly="true"
+                allowRoot="false"
+                maxSubtreeEdges="80"
+                rejectIfNotAC="true"
+                weight="15.0"/>
+
+            <operator id="SVSucldSigmaNC.c:$(n)"
+                spec="mixture.beast.evolution.operator.UCLDStdevNonCenteredOperator"
+                rates="@SVSrawRatesMix.c:$(n)"
+                indicator="@SVSindicatorMix.c:$(n)"
+                ucldStdev="@SVSsigmaUCLNMix.c:$(n)"
+                window="0.20"
+                rejectIfNotUC="true"
+                weight="15.0"/>
+
+            <operator id="SVSacSigma2NC.c:$(n)"
+                spec="mixture.beast.evolution.operator.ACSigma2NonCenteredOperator"
+                tree="@Tree.t:$(n)"
+                rates="@SVSrawRatesMix.c:$(n)"
+                indicator="@SVSindicatorMix.c:$(n)"
+                sigma2="@SVSsigma2Mix.c:$(n)"
+                minBranchLength="1e-12"
+                window="0.15"
+                rejectIfNotAC="true"
+                weight="15.0"/>
+
+            <operator id="SVSucacBridge.c:$(n)"
+                spec="mixture.beast.evolution.operator.UCACSwitchBridgeOperator"
+                tree="@Tree.t:$(n)"
+                rates="@SVSrawRatesMix.c:$(n)"
+                indicator="@SVSindicatorMix.c:$(n)"
+                ucldStdev="@SVSsigmaUCLNMix.c:$(n)"
+                sigma2="@SVSsigma2Mix.c:$(n)"
+                minBranchLength="1e-12"
+                weight="10.0"/>
+
+
+            <!-- Flag operator (weight=0) used to toggle mixture connectors -->
+            <operator id="SVSmixtureFlagSVSMix.c:$(n)"
+                spec="ScaleOperator"
+                parameter="@SVSclockRateMix.c:$(n)"
+                scaleFactor="0.75"
+                weight="0.0"/>
+
+            <!-- ========================================================= -->
+            <!-- MixtureTreeLikelihood wrapper (strict + SVS relaxed)      -->
+            <!-- This reproduces the legacy-style mixture example: a 2-component mixture over -->
+            <!-- tree likelihoods, with fixed weights.                     -->
+            <!-- Component 0: strict clock using the SAME mean rate param  -->
+            <!-- Component 1: the default treeLikelihood.$(n) (SVS relaxed)-->
+            <!-- ========================================================= -->
+
+            <!-- Strict clock model for the strict component -->
+            <branchRateModel id="MixtureStrictClockSVSMix.$(n)"
+                spec="beast.base.evolution.branchratemodel.StrictClockModel"
+                clock.rate="@SVSclockRateMix.c:$(n)"/>
+
+            <!-- Strict component tree likelihood -->
+            <distribution id="treeLikelihoodStrictSVSMix.$(n)"
+                spec="ThreadedTreeLikelihood"
+                data="@$(n)"
+                tree="@Tree.t:$(n)"
+                useAmbiguities="true">
+                <siteModel idref="SiteModel.s:$(n)"/>
+                <branchRateModel idref="MixtureStrictClockSVSMix.$(n)"/>
+            </distribution>
+
+            <!-- Mixture tree likelihood (replaces treeLikelihood.$(n) in likelihood) -->
+            <distribution id="mixtureTreeLikelihoodSVSMix.$(n)"
+                spec="mixture.beast.evolution.mixture.MixtureTreeLikelihood">
+                <subLikelihood idref="treeLikelihoodStrictSVSMix.$(n)"/>
+                <subLikelihood idref="treeLikelihood.$(n)"/>
+                <parameter id="w_topSVSMix.$(n)"
+                    spec="beast.base.inference.parameter.RealParameter"
+                    dimension="2"
+                    estimate="false"
+                    name="weights">0.3333333333333333 0.6666666666666666</parameter>
+            </distribution>
+
+            <!-- Optional mixture diagnostics, matching the legacy-style XML example. -->
+            <log id="mixtureAlloc.$(n)"
+                spec="mixture.beast.evolution.mixture.MixtureLikelihoodLogger"
+                mixture="@mixtureTreeLikelihoodSVSMix.$(n)"/>
+
+            <log id="hierSVS.$(n)"
+                spec="mixture.beast.evolution.mixture.HierarchicalSVSLogger"
+                printRBStats="true"
+                svsPrior="@SVSRelaxedClockMixPriorMix.c:$(n)"
+                topMixture="@mixtureTreeLikelihoodSVSMix.$(n)"/>
+
+]]>
+
+
+            <!-- CONNECT: state nodes -->
+            <connect srcID='SVSclockRateMix.c:$(n)' targetID='state' inputName='stateNode'
+                if='inposterior(SVSRelaxedClockMix.c:$(n)) and SVSclockRateMix.c:$(n)/estimate=true'/>
+            <connect srcID='SVSrawRatesMix.c:$(n)' targetID='state' inputName='stateNode'
+                if='inposterior(SVSRelaxedClockMix.c:$(n)) and SVSrawRatesMix.c:$(n)/estimate=true'/>
+            <connect srcID='SVSindicatorMix.c:$(n)' targetID='state' inputName='stateNode'
+                if='inposterior(SVSindicatorMix.c:$(n)) and SVSindicatorMix.c:$(n)/estimate=true'/>
+            <connect srcID='SVSsigma2Mix.c:$(n)' targetID='state' inputName='stateNode'
+                if='inposterior(SVSsigma2Mix.c:$(n)) and SVSsigma2Mix.c:$(n)/estimate=true'/>
+            <connect srcID='SVSsigmaUCLNMix.c:$(n)' targetID='state' inputName='stateNode'
+                if='inposterior(SVSsigmaUCLNMix.c:$(n)) and SVSsigmaUCLNMix.c:$(n)/estimate=true'/>
+
+            <!-- CONNECT: likelihood (mixture) -->
+            <!-- When SVSRelaxedClockMix is selected, replace the default treeLikelihood.$(n) in the likelihood -->
+            <!-- with mixtureTreeLikelihoodSVSMix.$(n), which mixes strict + SVS relaxed components. -->
+            <connect srcID='mixtureTreeLikelihoodSVSMix.$(n)' targetID='likelihood' inputName='distribution'
+                if='inposterior(SVSRelaxedClockMix.c:$(n))'>Use mixture tree likelihood (strict + SVS)</connect>
+
+            <!-- Disconnect the default treeLikelihood.$(n) from likelihood (it is still used as a subLikelihood) -->
+            <connect srcID='treeLikelihood.$(n)' targetID='likelihood' inputName='distribution'
+                if='nooperator(SVSmixtureFlagSVSMix.c:$(n))'/>
+
+            <!-- CONNECT: priors -->
+            <connect srcID='SVSRelaxedClockMixPriorMix.c:$(n)' targetID='prior' inputName='distribution'
+                if='inposterior(SVSRelaxedClockMix.c:$(n))'>SVS prior on branch rates (mixture package)</connect>
+
+            <connect srcID='SVSclockRateMix.prior.c:$(n)' targetID='prior' inputName='distribution'
+                if='inposterior(SVSRelaxedClockMix.c:$(n)) and SVSclockRateMix.c:$(n)/estimate=true'>Clock rate prior</connect>
+
+            <connect srcID='SVSsigma2Mix.prior.c:$(n)' targetID='prior' inputName='distribution'
+                if='inposterior(SVSRelaxedClockMix.c:$(n)) and SVSsigma2Mix.c:$(n)/estimate=true'>SVS sigma2 prior</connect>
+
+            <connect srcID='SVSsigmaUCLNMix.prior.c:$(n)' targetID='prior' inputName='distribution'
+                if='inposterior(SVSRelaxedClockMix.c:$(n)) and SVSsigmaUCLNMix.c:$(n)/estimate=true'>SVS ucldStdev prior</connect>
+
+
+            <!-- CONNECT: logging -->
+            <connect srcID='SVSclockRateMix.c:$(n)' targetID='tracelog' inputName='log'
+                if='inposterior(SVSRelaxedClockMix.c:$(n))'/>
+            <connect srcID='SVSrawRatesMix.c:$(n)' targetID='tracelog' inputName='log'
+                if='inposterior(SVSRelaxedClockMix.c:$(n))'/>
+            <connect srcID='SVSindicatorMix.c:$(n)' targetID='tracelog' inputName='log'
+                if='inposterior(SVSindicatorMix.c:$(n))'/>
+            <connect srcID='SVSsigma2Mix.c:$(n)' targetID='tracelog' inputName='log'
+                if='inposterior(SVSsigma2Mix.c:$(n))'/>
+            <connect srcID='SVSsigmaUCLNMix.c:$(n)' targetID='tracelog' inputName='log'
+                if='inposterior(SVSsigmaUCLNMix.c:$(n))'/>
+
+            <!-- log the SVS prior itself (optional) -->
+            <connect srcID='SVSRelaxedClockMixPriorMix.c:$(n)' targetID='tracelog' inputName='log'
+                if='inposterior(SVSRelaxedClockMixPriorMix.c:$(n))'/>
+
+            <!-- Mixture logging, matching the legacy-style XML example. -->
+            <connect srcID='treeLikelihoodStrictSVSMix.$(n)' targetID='tracelog' inputName='log'
+                if='inposterior(mixtureTreeLikelihoodSVSMix.$(n))'>Component 0 likelihood (strict)</connect>
+
+            <connect srcID='mixtureTreeLikelihoodSVSMix.$(n)' targetID='tracelog' inputName='log'
+                if='inposterior(mixtureTreeLikelihoodSVSMix.$(n))'>Mixture likelihood</connect>
+
+            <connect srcID='mixtureAlloc.$(n)' targetID='tracelog' inputName='log'
+                if='inposterior(mixtureTreeLikelihoodSVSMix.$(n))'>Mixture allocation diagnostics</connect>
+
+            <connect srcID='hierSVS.$(n)' targetID='tracelog' inputName='log'
+                if='inposterior(mixtureTreeLikelihoodSVSMix.$(n))'>Hierarchical SVS diagnostics</connect>
+
+<!-- CONNECT: operators -->
+            <connect srcID='SVSclockRateMix.scale.c:$(n)' targetID='mcmc' inputName='operator'
+                if='inposterior(SVSRelaxedClockMix.c:$(n)) and SVSclockRateMix.c:$(n)/estimate=true'>Scale clock rate</connect>
+
+            <connect srcID='SVSclockRateMixUpTreeDown.c:$(n)' targetID='mcmc' inputName='operator'
+                if='inposterior(SVSRelaxedClockMix.c:$(n)) and SVSclockRateMix.c:$(n)/estimate=true and Tree.t:$(n)/estimate=true'>Up/down clock rate and tree</connect>
+
+            <connect srcID='SVSsigma2Mix.scale.c:$(n)' targetID='mcmc' inputName='operator'
+                if='inposterior(SVSsigma2Mix.c:$(n)) and SVSsigma2Mix.c:$(n)/estimate=true'>Scale sigma2</connect>
+
+            <connect srcID='SVSsigmaUCLNMix.scale.c:$(n)' targetID='mcmc' inputName='operator'
+                if='inposterior(SVSsigmaUCLNMix.c:$(n)) and SVSsigmaUCLNMix.c:$(n)/estimate=true'>Scale ucldStdev</connect>
+
+            <connect srcID='SVSrawRatesMix.oneScale.c:$(n)' targetID='mcmc' inputName='operator'
+                if='inposterior(SVSRelaxedClockMix.c:$(n)) and SVSrawRatesMix.c:$(n)/estimate=true'>Scale single branch rate</connect>
+
+            <connect srcID='SVSrawRatesMix.subtreeScale.c:$(n)' targetID='mcmc' inputName='operator'
+                if='inposterior(SVSRelaxedClockMix.c:$(n)) and SVSrawRatesMix.c:$(n)/estimate=true'>Scale subtree branch rates</connect>
+
+            <connect srcID='SVSindicatorMix.gibbs.c:$(n)' targetID='mcmc' inputName='operator'
+                if='inposterior(SVSindicatorMix.c:$(n)) and SVSindicatorMix.c:$(n)/estimate=true'>Gibbs update indicator</connect>
+
+            <connect srcID='SVSacSubtreeU.c:$(n)' targetID='mcmc' inputName='operator'
+                if='inposterior(SVSRelaxedClockMix.c:$(n)) and SVSrawRatesMix.c:$(n)/estimate=true'>Perturb AC subtree whitened residuals</connect>
+
+            <connect srcID='SVSucldSigmaNC.c:$(n)' targetID='mcmc' inputName='operator'
+                if='inposterior(SVSRelaxedClockMix.c:$(n)) and SVSrawRatesMix.c:$(n)/estimate=true and SVSsigmaUCLNMix.c:$(n)/estimate=true'>Non-centered UCLD stdev move</connect>
+
+            <connect srcID='SVSacSigma2NC.c:$(n)' targetID='mcmc' inputName='operator'
+                if='inposterior(SVSRelaxedClockMix.c:$(n)) and SVSrawRatesMix.c:$(n)/estimate=true and SVSsigma2Mix.c:$(n)/estimate=true'>Non-centered AC sigma2 move</connect>
+
+            <connect srcID='SVSucacBridge.c:$(n)' targetID='mcmc' inputName='operator'
+                if='inposterior(SVSRelaxedClockMix.c:$(n)) and SVSrawRatesMix.c:$(n)/estimate=true and SVSindicatorMix.c:$(n)/estimate=true'>Bridge between UC and AC clock states</connect>
+
+            <connect srcID='SVSmixtureFlagSVSMix.c:$(n)' targetID='mcmc' inputName='operator'
+                     if='inposterior(SVSRelaxedClockMix.c:$(n))'>Mixture flag (do not sample)</connect>
+
+
+            <!-- CONNECT: tree logger -->
+            <connect srcID='SVSRelaxedClockMix.c:$(n)' targetID='TreeWithMetaDataLogger.t:$(n)' inputName='branchratemodel'
+                if='inposterior(SVSRelaxedClockMix.c:$(n))'/>
+
+            <connect srcID='Tree.t:$(n)' targetID='SVSRelaxedClockMix.c:$(n)' inputName='tree'
+                if='inposterior(SVSRelaxedClockMix.c:$(n))'/>
+
+        </subtemplate>
+
+    </mergewith>
+</beast>

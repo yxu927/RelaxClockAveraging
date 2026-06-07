@@ -22,6 +22,14 @@ Both examples validate and smoke-run under the local BEAST3 runner.
 
 Use `examples/mixture-typed.xml` for BEAST3 typed/spec testing. Keep `examples/mixture.xml` for compatibility and comparison.
 
+## BEAUti template
+
+The package ships `fxtemplates/SVSRelaxedClockTemplate.xml` as a BEAUti clock-model template for the SVS relaxed-clock mixture.
+
+The template is intentionally legacy-compatible: it generates XML using BEAST `RealParameter` / `IntegerParameter` state nodes and legacy prior wrappers, while relying on the migrated Java classes that also support typed inputs. This keeps BEAUti generation separate from the hand-maintained BEAST3 typed/spec example.
+
+The template includes the final clock-mixing operator schedule used by the examples and does not include `AlphaAnnealingOperator`.
+
 ## Validation commands
 
 ```bash

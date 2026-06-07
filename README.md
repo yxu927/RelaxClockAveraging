@@ -32,6 +32,14 @@ LPhyBEAST mapping code for converting LPhy objects into BEAST objects.
 
 Studio-facing support for working with the LPhy examples.
 
+## BEAUti
+
+The package includes one BEAUti clock-model template:
+
+- `fxtemplates/SVSRelaxedClockTemplate.xml`
+
+This template exposes the SVS relaxed-clock mixture as a BEAUti clock model and generates legacy-compatible BEAST XML using `RealParameter` / `IntegerParameter` inputs. It is intended as a BEAUti entry point for the mixture-clock analysis; the typed XML example below remains the reference BEAST3 typed/spec input.
+
 ## Examples
 
 Two BEAST XML examples are provided:
