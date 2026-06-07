@@ -1,108 +1,80 @@
 # RelaxClockAveraging
 
-RelaxClockAveraging is a BEAST3 package for Bayesian model averaging over relaxed molecular clock models.
+A BEAST2/BEAST3 package for Bayesian averaging over strict and relaxed
+molecular clock models using a mixture likelihood.
 
-The package implements a mixture-clock analysis in which branch rates are shared across clock components and an indicator variable selects between relaxed-clock regimes during MCMC. The BEAST module contains the clock model, mixture prior/likelihood components, clock-switching operators, and loggers used by the example analyses.
+## Overview
 
-## Project structure
+RelaxClockAveraging implements a hierarchical mixture of three clock models:
+a strict clock, an uncorrelated log-normal relaxed clock (UCLN), and an
+autocorrelated relaxed clock (AC). All three models operate on a single
+shared branch-rate vector. A binary SVS indicator, sampled at each MCMC
+step, selects between the UCLN and AC parameterisations of the shared
+rates. A top-level mixture combines the strict and relaxed likelihood
+components, and posterior model support can be monitored through the
+mixture loggers. Posterior clock-model probabilities are estimated jointly
+with the phylogeny, propagating model uncertainty without trans-dimensional
+jumps.
 
-RelaxClockAveraging contains four subprojects:
+## Installation
 
-### mixture-beast
+This package is not currently listed in the BEAST2 package manager.
+To install from a local build:
 
-The BEAST3 package implementation.
+1. Build the package zip (see [Building from source](#building-from-source)).
+2. Unpack `mixture-beast/target/mixture-beast-0.1.0.zip` into your BEAST2
+   package directory. The zip contains `version.xml`, `lib/`, `examples/`,
+   and `fxtemplates/`.
 
-- `SharedRatesClockModel` maps a shared branch-rate vector onto the tree.
-- `RelaxedRatesPriorSVS` evaluates the strict / uncorrelated / autocorrelated relaxed-clock prior mixture.
-- `CategoricalDistribution` provides the indicator prior.
-- `MixtureTreeLikelihood` combines tree likelihood components by mixture weights.
-- `IndicatorGibbsOperator` updates the clock indicator.
-- The remaining clock operators update branch rates, hyperparameters, and UC/AC state switches.
-- `MixtureLikelihoodLogger` and `HierarchicalSVSLogger` expose mixture diagnostics in the log file.
+Requires BEAST.base >= 2.8.0.
 
-### mixture-lphy
+## Usage
 
-LPhy model definitions and examples for the mixture-clock workflow.
+There is currently no BEAUti template. Analyses are configured directly
+through XML. The key `spec` classes are:
 
-### mixture-lphybeast
+- `mixture.beast.evolution.mixture.MixtureTreeLikelihood` - log-sum-exp
+  mixture over component tree likelihoods
+- `mixture.beast.evolution.mixture.RelaxedRatesPriorSVS` - SVS prior on
+  the shared rate vector; indicator selects UC or AC
+- `mixture.beast.evolution.mixture.SharedRatesClockModel` - maps the
+  shared rate vector to per-branch CTMC rates
+- `mixture.beast.evolution.mixture.CategoricalDistribution` - categorical
+  prior on the UC/AC indicator
+- `mixture.beast.evolution.operator.IndicatorGibbsOperator` - Gibbs
+  update of the binary UC/AC indicator
+- `mixture.beast.evolution.operator.UCACSwitchBridgeOperator`,
+  `ACSigma2NonCenteredOperator`, `ACSubtreeUIncrementOperator`,
+  `UCLDStdevNonCenteredOperator` - relaxed-clock mixing operators
 
-LPhyBEAST mapping code for converting LPhy objects into BEAST objects.
+See `examples/mixture.xml` for a complete annotated XML analysis.
 
-### mixture-lphy-studio
-
-Studio-facing support for working with the LPhy examples.
-
-## BEAUti
-
-The package includes one BEAUti clock-model template:
-
-- `fxtemplates/SVSRelaxedClockTemplate.xml`
-
-This template exposes the SVS relaxed-clock mixture as a BEAUti clock model and generates legacy-compatible BEAST XML using `RealParameter` / `IntegerParameter` inputs. It is intended as a BEAUti entry point for the mixture-clock analysis; the typed XML example below remains the reference BEAST3 typed/spec input.
-
-## Examples
-
-Two BEAST XML examples are provided:
-
-- `examples/mixture.xml`
-- `examples/mixture-typed.xml`
-
-`examples/mixture.xml` is the legacy-style XML example. It is kept for comparison and for users who want an XML that still resembles the original BEAST2-era input style.
-
-`examples/mixture-typed.xml` is the BEAST3 typed/spec version of the same analysis. It replaces legacy parameter and prior wrappers with BEAST3 typed parameters such as `RealScalarParam`, `RealVectorParam`, and `IntScalarParam`.
-
-Both examples use the same final relaxed-clock operator schedule:
-
-- `ACSubtreeUIncrementOperator`
-- `UCLDStdevNonCenteredOperator`
-- `ACSigma2NonCenteredOperator`
-- `UCACSwitchBridgeOperator`
-
-`AlphaAnnealingOperator` is implemented but is not used by these examples because it requires an alpha-coupled mixture likelihood setup.
-
-## Build and test
-
-Run from the repository root:
+## Example
 
 ```bash
-mvn -q -pl mixture-beast test
-mvn -q test
-mvn -q -DskipTests package
+beast examples/mixture.xml
 ```
 
-Validate the two XML examples:
+Two example analyses are provided:
+
+- `examples/mixture.xml` - legacy-compatible BEAST2 XML (31 taxa, 600
+  sites, JC+Gamma site model, coalescent tree prior)
+- `examples/mixture-typed.xml` - same analysis using BEAST3 typed/spec
+  parameter inputs
+
+## Citation
+
+Citation information will be added when available.
+
+## Building from source
+
+Requires JDK 25 and Maven.
 
 ```bash
-scripts/beast3_validate_xml.sh examples/mixture.xml
-scripts/beast3_validate_xml.sh examples/mixture-typed.xml
+mvn -q test                   # compile and run tests
+mvn -q -DskipTests package    # build JARs and package zip
 ```
 
-Run the full short-chain validation:
+## License
 
-```bash
-SMOKE_CHAIN_LENGTH=2000 scripts/validate_beast3_examples.sh
-```
-
-The validation script checks the final operator schedule, validates both XML files, and smoke-runs short-chain legacy-style and typed BEAST3 examples.
-
-## Running BEAST3
-
-The helper runner builds `mixture-beast`, constructs a path-safe module path, and launches the BEAST3 minimal runner with the package on `BEAST_PACKAGE_PATH`.
-
-```bash
-scripts/beast3_run.sh -overwrite examples/mixture-typed.xml
-```
-
-To run the legacy-style example under the same BEAST3 runtime:
-
-```bash
-scripts/beast3_run.sh -overwrite examples/mixture.xml
-```
-
-## BEAST2 and BEAST3 status
-
-This repository now targets BEAST3. The legacy-style XML is preserved as a comparison example, but the package build and examples are intended to run with the BEAST3 Maven/module runtime.
-
-The LPhy and LPhyBEAST modules build, but the repository does not yet provide a stable documented `.lphy -> XML` generation command for the typed BEAST3 example. The hand-maintained BEAST XML examples are therefore the current reference analyses.
-
-See `BEAST3_MIGRATION.md` for the migration notes and typed XML details.
+MIT - see [`LICENSE.txt`](LICENSE.txt).
