@@ -306,8 +306,9 @@
                 if='inposterior(SVSRelaxedClockMix.c:$(n))'>Use mixture tree likelihood (strict + SVS)</connect>
 
             <!-- Disconnect the default treeLikelihood.$(n) from likelihood (it is still used as a subLikelihood) -->
+            <!-- BEAUti disconnects a connector when its condition is false; tree is non-null for this clock. -->
             <connect srcID='treeLikelihood.$(n)' targetID='likelihood' inputName='distribution'
-                if='nooperator(SVSmixtureFlagSVSMix.c:$(n))'/>
+                if='SVSRelaxedClockMix.c:$(n)/tree=null'/>
 
             <!-- CONNECT: priors -->
             <connect srcID='SVSRelaxedClockMixPriorMix.c:$(n)' targetID='prior' inputName='distribution'
