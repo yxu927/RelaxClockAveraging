@@ -8,6 +8,7 @@ import lphy.core.model.Value;
 import lphybeast.BEASTContext;
 import lphybeast.GeneratorToBEAST;
 import mixture.beast.evolution.mixture.CategoricalDistribution;
+import mixture.lphybeast.tobeast.TypedParameterUtils;
 
 public class CategoricalToBEAST implements GeneratorToBEAST<Categorical, CategoricalDistribution> {
 
@@ -18,10 +19,29 @@ public class CategoricalToBEAST implements GeneratorToBEAST<Categorical, Categor
 
 
         Value<?> pVal = generator.getParams().get(DistributionConstants.pParamName);
-        cat.setInputValue("p", context.getBEASTObject(pVal));
+        BEASTInterface pObject = context.getBEASTObject(pVal);
+        if (!TypedParameterUtils.isRandom(pVal) && pVal.value() instanceof Double[] probabilities) {
+            BEASTInterface typedP = TypedParameterUtils.realVectorFrom(
+                    pObject,
+                    pVal.getId(),
+                    TypedParameterUtils.values(probabilities),
+                    false
+            );
+            TypedParameterUtils.replaceInContext(context, pVal, pObject, typedP);
+            cat.setInputValue("pVector", typedP);
+        } else {
+            cat.setInputValue("p", pObject);
+        }
 
-
-        cat.setInputValue("parameter", value);
+        Value<?> outVal = context.getOutput(generator);
+        BEASTInterface parameter = TypedParameterUtils.intScalarFrom(
+                value,
+                outVal != null ? outVal.getId() : "categorical." + generator.getUniqueId(),
+                outVal != null && outVal.value() instanceof Integer ? (Integer) outVal.value() : 0,
+                outVal != null && outVal.isRandom()
+        );
+        TypedParameterUtils.replaceInContext(context, outVal, value, parameter);
+        cat.setInputValue("parameterScalar", parameter);
 
         cat.initAndValidate();
         return cat;
