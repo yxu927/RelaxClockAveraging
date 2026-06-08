@@ -110,8 +110,8 @@ Passed:
 - `mvn -q -pl mixture-lphybeast -am test`
 - `mvn -q test`
 - `mvn -q -DskipTests package`
-- `scripts/beast3_validate_xml.sh examples/mixture.xml`
-- `scripts/beast3_validate_xml.sh examples/mixture-typed.xml`
+- `scripts/beast3_validate_xml.sh mixture-beast/examples/mixture.xml`
+- `scripts/beast3_validate_xml.sh mixture-beast/examples/mixture-typed.xml`
 - `SMOKE_CHAIN_LENGTH=2000 scripts/validate_beast3_examples.sh`
 - `mvn -q -pl mixture-lphybeast -am -DskipTests install`
 - `mvn -q -pl mixture-lphybeast-launcher exec:exec -Dlphybeast.args="convert --packagedir ../target/lphybeast-packages -o ../target/lphybeast-new.xml -l 2000 -le 100 ../mixture-lphy/examples/new.lphy"`

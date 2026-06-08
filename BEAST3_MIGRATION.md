@@ -4,12 +4,12 @@
 
 This branch now ships two BEAST XML examples:
 
-- `examples/mixture.xml`
-- `examples/mixture-typed.xml`
+- `mixture-beast/examples/mixture.xml`
+- `mixture-beast/examples/mixture-typed.xml`
 
-`examples/mixture.xml` is the legacy-compatible baseline. It keeps the original XML style while running under the BEAST3 migration branch.
+`mixture-beast/examples/mixture.xml` is the legacy-compatible baseline. It keeps the original XML style while running under the BEAST3 migration branch.
 
-`examples/mixture-typed.xml` is the BEAST3 typed/spec version of the same example.
+`mixture-beast/examples/mixture-typed.xml` is the BEAST3 typed/spec version of the same example.
 
 Both examples validate and smoke-run under the local BEAST3 runner.
 
@@ -17,14 +17,14 @@ Both examples validate and smoke-run under the local BEAST3 runner.
 
 | File | Purpose | Status |
 | --- | --- | --- |
-| `examples/mixture.xml` | Legacy-compatible baseline | Validate + smoke tested |
-| `examples/mixture-typed.xml` | BEAST3 typed/spec example | Validate + smoke tested |
+| `mixture-beast/examples/mixture.xml` | Legacy-compatible baseline | Validate + smoke tested |
+| `mixture-beast/examples/mixture-typed.xml` | BEAST3 typed/spec example | Validate + smoke tested |
 
-Use `examples/mixture-typed.xml` for BEAST3 typed/spec testing. Keep `examples/mixture.xml` for compatibility and comparison.
+Use `mixture-beast/examples/mixture-typed.xml` for BEAST3 typed/spec testing. Keep `mixture-beast/examples/mixture.xml` for compatibility and comparison.
 
 ## BEAUti template
 
-The package ships `fxtemplates/SVSRelaxedClockTemplate.xml` as a BEAUti clock-model template for the SVS relaxed-clock mixture.
+The package ships `mixture-beast/fxtemplates/SVSRelaxedClockTemplate.xml` as a BEAUti clock-model template for the SVS relaxed-clock mixture.
 
 The template is intentionally legacy-compatible: it generates XML using BEAST `RealParameter` / `IntegerParameter` state nodes and legacy prior wrappers, while relying on the migrated Java classes that also support typed inputs. This keeps BEAUti generation separate from the hand-maintained BEAST3 typed/spec example.
 
@@ -37,8 +37,8 @@ mvn -q -pl mixture-beast test
 mvn -q test
 mvn -q -DskipTests package
 
-scripts/beast3_validate_xml.sh examples/mixture.xml
-scripts/beast3_validate_xml.sh examples/mixture-typed.xml
+scripts/beast3_validate_xml.sh mixture-beast/examples/mixture.xml
+scripts/beast3_validate_xml.sh mixture-beast/examples/mixture-typed.xml
 SMOKE_CHAIN_LENGTH=2000 scripts/validate_beast3_examples.sh
 ```
 
@@ -54,8 +54,8 @@ Typed parameters use BEAST3 `RealScalarParam`, `RealVectorParam`, and `IntScalar
 
 | XML | legacy parameter specs | typed parameter specs | legacy Prior specs | typed LogNormal specs | custom mixture specs |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| `examples/mixture.xml` | 17 | 3 | 4 | 1 | 13 |
-| `examples/mixture-typed.xml` | 0 | 20 | 0 | 5 | 13 |
+| `mixture-beast/examples/mixture.xml` | 17 | 3 | 4 | 1 | 13 |
+| `mixture-beast/examples/mixture-typed.xml` | 0 | 20 | 0 | 5 | 13 |
 
 ## Final Clock-Mixing Operators
 
@@ -87,7 +87,7 @@ These custom classes were migrated additively:
 - `MixtureLikelihoodLogger`
 - `HierarchicalSVSLogger`
 
-Legacy input names remain supported. Typed input names are used in `examples/mixture-typed.xml`.
+Legacy input names remain supported. Typed input names are used in `mixture-beast/examples/mixture-typed.xml`.
 
 ## LPhy / LPhyBEAST status
 
@@ -95,7 +95,6 @@ The LPhy-side modules test and package successfully:
 
 - `mixture-lphy`
 - `mixture-lphybeast`
-- `mixture-lphy-studio`
 - `mixture-lphybeast-launcher`
 
 The LPhyBEAST mapping has been moved to the LPhyBEAST 2.0 mapping API. The
@@ -133,7 +132,7 @@ state/log/operator schedule.
 
 ## Safety notes
 
-`examples/mixture.xml` remains the legacy-compatible example. `examples/mixture-typed.xml` remains the separately validated BEAST3 typed/spec example.
+`mixture-beast/examples/mixture.xml` remains the legacy-compatible example. `mixture-beast/examples/mixture-typed.xml` remains the separately validated BEAST3 typed/spec example.
 
 Do not replace the legacy example until users and the LPhyBEAST generation path are ready.
 

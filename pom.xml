@@ -26,7 +26,6 @@
     <modules>
         <module>mixture-beast</module>
         <module>mixture-lphy</module>
-        <module>mixture-lphy-studio</module>
         <module>mixture-lphybeast</module>
         <module>mixture-lphybeast-launcher</module>
     </modules>

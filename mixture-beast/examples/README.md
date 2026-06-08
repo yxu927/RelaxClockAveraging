@@ -15,7 +15,7 @@ Both examples include the same final relaxed-clock mixing operators:
 Validate:
 
 ```bash
-scripts/beast3_validate_xml.sh examples/mixture.xml
-scripts/beast3_validate_xml.sh examples/mixture-typed.xml
+scripts/beast3_validate_xml.sh mixture-beast/examples/mixture.xml
+scripts/beast3_validate_xml.sh mixture-beast/examples/mixture-typed.xml
 SMOKE_CHAIN_LENGTH=2000 scripts/validate_beast3_examples.sh
 ```

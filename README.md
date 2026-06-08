@@ -10,8 +10,8 @@ The package supports direct BEAST XML use, BEAST3 typed/spec XML, a BEAUti clock
 - `mixture-lphy`: LPhy generators and functions for the mixture clock model.
 - `mixture-lphybeast`: LPhyBEAST mappings from LPhy objects to BEAST XML.
 - `mixture-lphybeast-launcher`: Maven launcher for `.lphy -> XML` conversion.
-- `mixture-lphy-studio`: optional LPhy Studio integration.
-- `examples`: maintained BEAST XML examples.
+- `mixture-beast/examples`: maintained BEAST XML examples.
+- `mixture-beast/fxtemplates`: BEAUti clock-model template.
 - `scripts`: local BEAST3 validation and smoke-run helpers.
 
 ## Requirements
@@ -56,23 +56,23 @@ The installed package contains `version.xml`, `lib/mixture-beast-0.1.0.jar`, `ex
 
 Two complete XML examples are maintained:
 
-- `examples/mixture.xml`: legacy-compatible baseline example.
-- `examples/mixture-typed.xml`: BEAST3 typed/spec example.
+- `mixture-beast/examples/mixture.xml`: legacy-compatible baseline example.
+- `mixture-beast/examples/mixture-typed.xml`: BEAST3 typed/spec example.
 
 Both examples use the same relaxed-clock operator schedule: `ACSubtreeUIncrementOperator`, `UCLDStdevNonCenteredOperator`, `ACSigma2NonCenteredOperator`, and `UCACSwitchBridgeOperator`. `AlphaAnnealingOperator` is implemented but intentionally excluded from the shipped examples because it requires an alpha-coupled mixture-likelihood setup.
 
 Validate the examples:
 
 ```bash
-scripts/beast3_validate_xml.sh examples/mixture.xml
-scripts/beast3_validate_xml.sh examples/mixture-typed.xml
+scripts/beast3_validate_xml.sh mixture-beast/examples/mixture.xml
+scripts/beast3_validate_xml.sh mixture-beast/examples/mixture-typed.xml
 ```
 
 Run the examples:
 
 ```bash
-scripts/beast3_run.sh -overwrite examples/mixture.xml
-scripts/beast3_run.sh -overwrite examples/mixture-typed.xml
+scripts/beast3_run.sh -overwrite mixture-beast/examples/mixture.xml
+scripts/beast3_run.sh -overwrite mixture-beast/examples/mixture-typed.xml
 ```
 
 Run any XML by path:
@@ -94,7 +94,7 @@ The local scripts build the package from the checkout before invoking BEAST.
 The BEAUti clock-model template is:
 
 ```text
-fxtemplates/SVSRelaxedClockTemplate.xml
+mixture-beast/fxtemplates/SVSRelaxedClockTemplate.xml
 ```
 
 After installing the package zip, open BEAUti 3 / BEAST.base 2.8+ and select:

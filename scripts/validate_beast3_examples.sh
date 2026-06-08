@@ -19,8 +19,8 @@ from pathlib import Path
 import xml.etree.ElementTree as ET
 
 targets = {
-    "legacy": Path("examples/mixture.xml"),
-    "typed": Path("examples/mixture-typed.xml"),
+    "legacy": Path("mixture-beast/examples/mixture.xml"),
+    "typed": Path("mixture-beast/examples/mixture-typed.xml"),
 }
 required = {
     "ACSubtreeUIncrementOperator",
@@ -53,10 +53,10 @@ echo "== Package =="
 mvn -q -DskipTests package
 
 echo "== Validate legacy-compatible XML =="
-scripts/beast3_validate_xml.sh examples/mixture.xml
+scripts/beast3_validate_xml.sh mixture-beast/examples/mixture.xml
 
 echo "== Validate BEAST3 typed XML =="
-scripts/beast3_validate_xml.sh examples/mixture-typed.xml
+scripts/beast3_validate_xml.sh mixture-beast/examples/mixture-typed.xml
 
 make_smoke_xml() {
   local src="$1"
@@ -91,8 +91,8 @@ PY
 }
 
 echo "== Create short-chain smoke XML copies =="
-make_smoke_xml examples/mixture.xml "$LEGACY_SMOKE_XML"
-make_smoke_xml examples/mixture-typed.xml "$TYPED_SMOKE_XML"
+make_smoke_xml mixture-beast/examples/mixture.xml "$LEGACY_SMOKE_XML"
+make_smoke_xml mixture-beast/examples/mixture-typed.xml "$TYPED_SMOKE_XML"
 
 echo "== Smoke run legacy-compatible XML =="
 rm -rf "$LEGACY_SMOKE_RUN_DIR"
