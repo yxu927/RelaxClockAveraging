@@ -23,6 +23,12 @@ Base check: `origin/main...main = 0 0`, worktree clean before changes.
   semantics.
 - Real `mixture-lphy/examples/new.lphy -> XML -> BEAST3 validate -> smoke run`
   now passes on the LPhyBEAST 2.0 spike path.
+- The LPhy `MixturePhyloCTMC` `index` parameter is simulation-only. The BEAST
+  mapper now removes that top-level allocation value/prior from the generated
+  marginal mixture XML, so `i_top` is not left as an unoperated state node.
+- Fixed scalar SVS hyperparameters, such as `rootLogRate = 0.0`, are kept out
+  of the generated MCMC state/log/operator schedule and are serialized as fixed
+  nested typed parameters when needed.
 - The root-slot bridge remains important: LPhy `SVSRawBranchRates` values are
   node-indexed and contain an unused root slot set to `0.0`, while BEAST expects
   `ratesVector` over non-root branches only. The mapper strips the true tree-root
@@ -122,5 +128,6 @@ The BEAST runs fall back to `BeerLikelihoodCore4` because local BEAGLE JNI is un
 ## Recommended Next Step
 
 Review and commit the LPhyBEAST 2.0 spike locally, then decide whether to keep the launcher module as a supported
-developer entry point. The next modeling cleanup is to decide whether the generated top-level `i_top` Categorical
-state should be omitted/marginalized explicitly, or given a small operator if a sampled allocation variable is desired.
+developer entry point. The generated `MixturePhyloCTMC` path currently uses the marginal mixture likelihood; if a
+future LPhy model wants sampled top-level allocation variables instead, that should be introduced as an explicit
+alternate mapper/model rather than reusing the current marginal path.

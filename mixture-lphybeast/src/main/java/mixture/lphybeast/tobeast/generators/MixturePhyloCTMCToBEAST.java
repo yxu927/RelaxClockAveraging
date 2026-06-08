@@ -49,6 +49,8 @@ public class MixturePhyloCTMCToBEAST implements GeneratorToBEAST<MixturePhyloCTM
         compVals.add(comp2Val);
         if (comp3Val != null) compVals.add(comp3Val);
 
+        removeSimulationOnlyIndex(mix, context);
+
         for (Value<?> compVal : compVals) {
             BEASTInterface alg = context.getBEASTObject(compVal);
             if (alg instanceof Alignment && alg != beastAlignment) {
@@ -191,6 +193,26 @@ public class MixturePhyloCTMCToBEAST implements GeneratorToBEAST<MixturePhyloCTM
     @Override
     public Class<MixtureTreeLikelihood> getBEASTClass() {
         return MixtureTreeLikelihood.class;
+    }
+
+    private static void removeSimulationOnlyIndex(MixturePhyloCTMC mix, BEASTContext context) {
+        final Value<?> indexVal = mix.getParams().get(MixturePhyloCTMC.INDEX);
+        if (indexVal == null) {
+            return;
+        }
+
+        final BEASTInterface indexObject = context.getBEASTObject(indexVal);
+        if (indexObject != null) {
+            context.removeBEASTObject(indexObject);
+        }
+
+        final Generator indexGenerator = indexVal.getGenerator();
+        if (indexGenerator != null) {
+            final BEASTInterface indexPrior = context.getBEASTObject(indexGenerator);
+            if (indexPrior != null) {
+                context.removeBEASTObject(indexPrior);
+            }
+        }
     }
 
     private static RelaxedRatesPriorSVS tryFindSVSPrior(AbstractPhyloCTMC comp, BEASTContext context) {

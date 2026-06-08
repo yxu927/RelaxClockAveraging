@@ -235,11 +235,13 @@ public class SVSRawBranchRatesToBEAST implements GeneratorToBEAST<SVSRawBranchRa
                                               final RealScalarParam<?> scalar,
                                               final boolean estimate) {
         scalar.isEstimatedInput.setValue(estimate, scalar);
-        if (!context.getState().contains(scalar)) {
+        if (estimate && !context.getState().contains(scalar)) {
             context.getState().add(scalar);
         }
         if (!estimate) {
+            context.getState().remove(scalar);
             context.addSkipOperator(scalar);
+            context.addSkipLoggable(scalar);
         }
     }
 
