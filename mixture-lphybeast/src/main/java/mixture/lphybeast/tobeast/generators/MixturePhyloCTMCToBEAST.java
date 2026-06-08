@@ -2,10 +2,8 @@ package mixture.lphybeast.tobeast.generators;
 
 import beast.base.core.BEASTInterface;
 import beast.base.evolution.alignment.Alignment;
-import beast.base.evolution.likelihood.GenericTreeLikelihood;
-import beast.base.evolution.likelihood.ThreadedTreeLikelihood;
 import beast.base.inference.Distribution;
-import beast.base.inference.parameter.RealParameter;
+import beast.base.spec.evolution.likelihood.ThreadedTreeLikelihood;
 import lphy.base.evolution.likelihood.AbstractPhyloCTMC;
 import mixture.lphy.evolution.auto.MixturePhyloCTMC;
 import lphy.base.evolution.likelihood.PhyloCTMC;
@@ -63,16 +61,19 @@ public class MixturePhyloCTMCToBEAST implements GeneratorToBEAST<MixturePhyloCTM
         boolean observed = mixOutput != null && context.isObserved(mixOutput);
 
         final int K = compVals.size();
-        final List<GenericTreeLikelihood> subTL = new ArrayList<>(K);
+        final List<Distribution> subTL = new ArrayList<>(K);
 
         boolean addBranchOperatorsThisTime = true;
 
         RelaxedRatesPriorSVS svsPrior = null;
+        BEASTInterface mixtureTree = null;
+        BEASTInterface mixtureSiteModel = null;
 
         for (int i = 0; i < K; i++) {
             AbstractPhyloCTMC comp = (AbstractPhyloCTMC) compVals.get(i).getGenerator();
+            PhyloCTMC phylo = asPhyloCTMC(comp);
 
-            GenericTreeLikelihood tl;
+            Distribution tl;
             if (observed) {
                 tl = new ThreadedTreeLikelihood();
                 tl.setInputValue("useAmbiguities", true);
@@ -84,14 +85,19 @@ public class MixturePhyloCTMCToBEAST implements GeneratorToBEAST<MixturePhyloCTM
             tl.setInputValue("data", beastAlignment);
 
             PhyloCTMCToBEAST.constructTreeAndBranchRate(
-                    asPhyloCTMC(comp),
+                    phylo,
                     tl,
                     context,
                     !addBranchOperatorsThisTime
             );
             addBranchOperatorsThisTime = false;
 
-            tl.setInputValue("siteModel", PhyloCTMCToBEAST.constructSiteModel(asPhyloCTMC(comp), context));
+            BEASTInterface siteModel = PhyloCTMCToBEAST.constructSiteModel(phylo, context);
+            tl.setInputValue("siteModel", siteModel);
+            if (mixtureTree == null) {
+                mixtureTree = context.getBEASTObject(phylo.getTree());
+                mixtureSiteModel = siteModel;
+            }
 
             tl.initAndValidate();
             tl.setID(beastAlignment.getID() + ".treeLikelihood.component" + i);
@@ -105,6 +111,9 @@ public class MixturePhyloCTMCToBEAST implements GeneratorToBEAST<MixturePhyloCTM
         }
 
         MixtureTreeLikelihood beastMix = new MixtureTreeLikelihood();
+        beastMix.setInputValue("data", beastAlignment);
+        beastMix.setInputValue("tree", mixtureTree);
+        beastMix.setInputValue("siteModel", mixtureSiteModel);
         beastMix.setInputValue("subLikelihood", subTL);
 
         @SuppressWarnings("unchecked")
@@ -127,8 +136,7 @@ public class MixturePhyloCTMCToBEAST implements GeneratorToBEAST<MixturePhyloCTM
             TypedParameterUtils.replaceInContext(context, wVal, weightsObject, typedWeights);
             beastMix.setInputValue("weightsVector", typedWeights);
         } else {
-            RealParameter wParam = context.getAsRealParameter(wVal);
-            beastMix.setInputValue("weights", wParam);
+            beastMix.setInputValue("weightsVector", context.getAsRealVector(wVal));
         }
 
         beastMix.initAndValidate();
@@ -138,7 +146,7 @@ public class MixturePhyloCTMCToBEAST implements GeneratorToBEAST<MixturePhyloCTM
         for (Value<?> compVal : compVals) {
             AbstractPhyloCTMC comp = (AbstractPhyloCTMC) compVal.getGenerator();
             BEASTInterface tlSingle = context.getBEASTObject(comp);
-            if (tlSingle instanceof Distribution || tlSingle instanceof GenericTreeLikelihood) {
+            if (tlSingle instanceof Distribution) {
                 context.removeBEASTObject(tlSingle);
             }
         }

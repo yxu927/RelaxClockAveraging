@@ -1,21 +1,18 @@
 package mixture.lphybeast.spi;
 
-
-
 import jebl.evolution.sequences.SequenceType;
-import lphy.base.evolution.datatype.DataType;
 import lphy.base.evolution.tree.TimeTreeNode;
 import lphy.core.model.Generator;
 import lphybeast.GeneratorToBEAST;
 import lphybeast.ValueToBEAST;
-import lphybeast.spi.LPhyBEASTExt;
+import lphybeast.spi.LPhyBEASTMapping;
+import mixture.lphybeast.tobeast.generators.CategoricalToBEAST;
+import mixture.lphybeast.tobeast.generators.MixturePhyloCTMCToBEAST;
+import mixture.lphybeast.tobeast.generators.SVSRawBranchRatesToBEAST;
+import mixture.lphybeast.tobeast.generators.SharedRatesClockToBEAST;
 
-import mixture.lphybeast.tobeast.generators.*;
-
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-
 
 /**
  * The "Container" provider class of SPI
@@ -24,21 +21,20 @@ import java.util.Map;
  * to extend.
  *
  */
-public class LBMixture implements LPhyBEASTExt {
+public class LBMixture implements LPhyBEASTMapping {
 
     @Override
     public List<Class<? extends ValueToBEAST>> getValuesToBEASTs() {
-        return Arrays.asList(
-
-        );
+        return List.of();
     }
 
     @Override
     public List<Class<? extends GeneratorToBEAST>> getGeneratorToBEASTs() {
-        return Arrays.asList(
-
+        return List.of(
                 MixturePhyloCTMCToBEAST.class,
-                CategoricalToBEAST.class,SharedRatesClockToBEAST.class,SVSRawBranchRatesToBEAST.class
+                CategoricalToBEAST.class,
+                SharedRatesClockToBEAST.class,
+                SVSRawBranchRatesToBEAST.class
         );
     }
 
@@ -49,14 +45,12 @@ public class LBMixture implements LPhyBEASTExt {
 
     @Override
     public List<Class<? extends Generator>> getExcludedGenerator() {
-        return Arrays.asList(
-        );
+        return List.of();
     }
 
     @Override
     public List<Class> getExcludedValueType() {
-        return Arrays.asList(TimeTreeNode.class
-        );
+        return List.of(TimeTreeNode.class);
     }
 
 }

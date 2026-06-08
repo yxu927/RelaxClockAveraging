@@ -1,7 +1,7 @@
 # LPhy / LPhyBEAST Migration Audit
 
 Date: 2026-06-08
-Branch: `lphy-lphybeast-migration`
+Branch: `lphy-lphybeast-migration`, continued on `lphybeast-2-mapping-spike`
 Base check: `origin/main...main = 0 0`, worktree clean before changes.
 
 ## Summary
@@ -9,7 +9,11 @@ Base check: `origin/main...main = 0 0`, worktree clean before changes.
 - LPhy AC model is already martingale-corrected:
   `log(r_child) ~ Normal(log(r_parent) - 0.5 * sigma2 * dt, sigma2 * dt)`.
 - Added LPhy characterization tests that fail against the older uncorrected AC parameterization.
-- Updated the custom LPhyBEAST mappers to generate BEAST3 typed/spec inputs where this can be done without disconnecting LPhyBEAST 1.3 default priors.
+- Migrated the LPhyBEAST module to the LPhyBEAST 2.0 mapping API used by the CalibratedCPP reference:
+  JPMS `module-info.java`, `LPhyBEASTMapping`, LPhy `1.8.0-beta1`, and `lphybeast 2.0.0-SNAPSHOT`.
+- Added a POM-only `mixture-lphybeast-launcher` module so the real CLI path can be exercised with
+  `lphybeast.LPhyBeastMain`.
+- Updated the custom LPhyBEAST mappers to generate BEAST3 typed/spec inputs end-to-end for the SVS/shared-rates path.
 - Added the missing final relaxed-clock operators to the LPhyBEAST SVS mapper:
   `ACSubtreeUIncrementOperator`, `UCLDStdevNonCenteredOperator`,
   `ACSigma2NonCenteredOperator`, and `UCACSwitchBridgeOperator`.
@@ -17,11 +21,12 @@ Base check: `origin/main...main = 0 0`, worktree clean before changes.
   indicator is random. For fixed indicators, the mapper adds only the
   compatible within-model non-centered operators, preserving the fixed-model
   semantics.
-- Tried a real `mixture-lphy/examples/new.lphy -> XML` conversion. That exposed
-  and fixed one mapper issue: LPhy `SVSRawBranchRates` values are node-indexed
-  and contain an unused root slot set to `0.0`, while BEAST expects
-  `ratesVector` over non-root branches only. The mapper now strips the root slot
-  before constructing the typed positive rates vector.
+- Real `mixture-lphy/examples/new.lphy -> XML -> BEAST3 validate -> smoke run`
+  now passes on the LPhyBEAST 2.0 spike path.
+- The root-slot bridge remains important: LPhy `SVSRawBranchRates` values are
+  node-indexed and contain an unused root slot set to `0.0`, while BEAST expects
+  `ratesVector` over non-root branches only. The mapper strips the true tree-root
+  node number, not just the first vector entry.
 - Did not add `AlphaAnnealingOperator`; the LPhy model path does not construct the alpha-coupled likelihood structure required for it.
 
 ## LPhy Math Audit
@@ -45,12 +50,12 @@ Current custom generator mappings:
 
 | LPhy generator | BEAST class | Current mapping status |
 | --- | --- | --- |
-| `SVSRawBranchRates` | `RelaxedRatesPriorSVS` | Uses `ratesVector` and `indicatorScalar`; strips the unused LPhy node-indexed root rates slot when the default value mapper provides a full node-count vector. Keeps `ucldStdev`, `sigma2`, `rootLogRate` legacy because LPhyBEAST 1.3 default priors still bind those values as `RealParameter`. Adds final non-centered/switch operators, with bridge moves gated to random indicators only. |
-| `SharedRatesClock` | `SharedRatesClockModel` | Accepts typed `ratesVector`; uses typed `meanRateScalar` only if the context already provides a typed scalar or when meanRate is omitted. |
+| `SVSRawBranchRates` | `RelaxedRatesPriorSVS` | Uses `ratesVector`, `indicatorScalar`, `ucldStdevScalar`, `sigma2Scalar`, and `rootLogRateScalar`; strips the unused LPhy node-indexed root rates slot when the default value mapper provides a full node-count vector. Adds final non-centered/switch operators, with bridge moves gated to random indicators only. Fixed scalar hyperparameters are marked `estimate=false`; non-centered operators that would change `sigma2` or `ucldStdev` are only generated when those values are random. |
+| `SharedRatesClock` | `SharedRatesClockModelSpec` | Uses BEAST3 spec branch-rate model with typed `ratesVector` and `meanRateScalar`, so core LPhyBEAST 2.0 `PhyloCTMCToBEAST` accepts it as a `branchRateModel`. |
 | `Categorical` | `CategoricalDistribution` | Uses `parameterScalar`; uses `pVector` when `p` is deterministic/constant, otherwise keeps legacy `p`. |
-| `MixturePhyloCTMC` | `MixtureTreeLikelihood` | Uses `weightsVector` when weights are deterministic/constant; keeps legacy `weights` for random weights. Builds component tree likelihoods and mixture loggers. |
+| `MixturePhyloCTMC` | `MixtureTreeLikelihood` | Uses `weightsVector`; builds spec `ThreadedTreeLikelihood` component likelihoods; supplies inherited `data`, `tree`, and `siteModel` inputs required by `MixtureTreeLikelihood`'s `GenericTreeLikelihood` base class; adds mixture and hierarchical SVS loggers. |
 
-This is a typed custom-structure path, not yet a fully typed end-to-end XML path equivalent to `examples/mixture-typed.xml`.
+This is now a typed custom-structure path that can generate a BEAST3-valid XML from `new.lphy`.
 
 ### Operator coverage
 
@@ -73,21 +78,19 @@ The same test also locks the LPhy raw-rates dimensional bridge: a node-indexed
 LPhy `rawRates` vector with an unused root `0.0` slot is converted to the
 BEAST non-root branch vector before constructing `RealVectorParam<PositiveReal>`.
 
-## Remaining LPhyBEAST Limits
+## Remaining LPhyBEAST Notes
 
-Full typed XML generation is blocked by LPhyBEAST 1.3 default mappers, not by the custom mixture classes:
+The old LPhyBEAST 1.3 ABI blocker is no longer on the active spike path. The 2.0 path currently depends on a local
+install of the upstream LPhyBEAST `beast3` branch:
 
-- `LogNormalToBEAST`, `NormalToBEAST`, and `YuleToBEAST` cast target values to legacy `RealParameter`.
-- `BEASTContext.getAsRealParameter(...)` assumes legacy `Parameter`.
-- Forcing `clockRate`, `sigma2`, `sigmaUCLN`, or `rootLogRate` to typed objects inside the custom mapper would disconnect their default priors/operators from the object used by the SVS prior.
+- `/private/tmp/LPhyBeast-beast3-ref-20260608`
+- `mvn -q -pl lphybeast -am -DskipTests install`
 
-Local CLI conversion also exposed packaging/classpath friction:
+Current non-fatal generated-XML warnings:
 
-- With only this package service loaded, LPhyBEAST cannot convert ordinary constants such as `L = 800` because default value mappers are absent.
-- Running without `-vf` does not discover `lphybeast.spi.LPhyBEASTExt` from the ordinary Java classpath; LPhyBEAST 1.3 expects BEAST package/version-file services.
-- Adding a temporary service for `lphybeast.spi.LPhyBEASTExtImpl` requires the BEAST 2.7 package runtime for classes such as `beastclassic.evolution.datatype.ContinuousDataType` and `mutablealignment.MutableAlignment`.
-- With Maven BEAST3 typed classes first and BEAST 2.7 package jars later, conversion reaches the custom SVS mappers and constructs the relaxed-clock model, but then fails in `BEASTContext.getAllStatesSize()` because LPhyBEAST 1.3 calls `StateNode.getDimension()`. The BEAST3 `beast-base 2.8.x` `StateNode` used by typed classes no longer provides that old BEAST2-style ABI. Reversing classpath order avoids this ABI failure but breaks BEAST3 typed parameter construction.
-- The CalibratedCPP reference is on newer `lphybeast` 2.0.0-SNAPSHOT and uses `LPhyBEASTMapping`, so it is a useful structural direction but not a drop-in API match for this repo's 1.3.0 dependency.
+- `rootLogRate` is fixed at `0.0`, is included as `estimate=false`, and has no operator. It is read by AC operators and does not move.
+- `i_top` has no default operator. In the current generated XML, the top mixture is marginalized through
+  `weightsVector`, so `i_top` is not used by the likelihood; its Categorical factor is constant for MCMC ratios.
 
 ## Example Coverage
 
@@ -104,17 +107,20 @@ Passed:
 - `scripts/beast3_validate_xml.sh examples/mixture.xml`
 - `scripts/beast3_validate_xml.sh examples/mixture-typed.xml`
 - `SMOKE_CHAIN_LENGTH=2000 scripts/validate_beast3_examples.sh`
+- `mvn -q -pl mixture-lphybeast -am -DskipTests install`
+- `mvn -q -pl mixture-lphybeast-launcher exec:exec -Dlphybeast.args="convert --packagedir ../target/lphybeast-packages -o ../target/lphybeast-new.xml -l 2000 -le 100 ../mixture-lphy/examples/new.lphy"`
+- `xmllint --noout mixture-lphy/target/lphybeast-new.xml`
+- `scripts/beast3_validate_xml.sh mixture-lphy/target/lphybeast-new.xml`
+- `scripts/beast3_run.sh -overwrite mixture-lphy/target/lphybeast-new.xml`
 
-Attempted but not yet passing:
-
-- Real `mixture-lphy/examples/new.lphy -> XML` through `lphybeast.LPhyBeastCMD`
-  with both the default LPhyBEAST extension and `mixture.lphybeast` registered.
-  The custom SVS mapper now gets past the raw-rates root-slot issue and reaches
-  model construction, but the final XML write remains blocked by the LPhyBEAST
-  1.3 / BEAST3 typed runtime ABI conflict described above.
+The generated XML output path is resolved by LPhyBEAST relative to the `.lphy`
+script directory after it sets the working directory, so `-o
+../target/lphybeast-new.xml` writes to `mixture-lphy/target/lphybeast-new.xml`.
 
 The BEAST runs fall back to `BeerLikelihoodCore4` because local BEAGLE JNI is unavailable; this is unchanged from the direct XML path and did not prevent validation or smoke runs.
 
 ## Recommended Next Step
 
-To reach fully typed `.lphy -> BEAST3 spec XML`, add or adopt typed LPhyBEAST value/generator mappers for scalar and vector parameters plus standard priors, then move `clockRate`, `sigma2`, `sigmaUCLN`, and `rootLogRate` from legacy `RealParameter` to `RealScalarParam`. After that, re-run conversion for `new.lphy` and compare the generated XML against `examples/mixture-typed.xml`.
+Review and commit the LPhyBEAST 2.0 spike locally, then decide whether to keep the launcher module as a supported
+developer entry point. The next modeling cleanup is to decide whether the generated top-level `i_top` Categorical
+state should be omitted/marginalized explicitly, or given a small operator if a sampled allocation variable is desired.

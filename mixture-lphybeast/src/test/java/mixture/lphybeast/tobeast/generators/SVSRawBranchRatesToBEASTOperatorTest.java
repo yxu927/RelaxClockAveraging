@@ -4,6 +4,7 @@ import beast.base.evolution.tree.TreeParser;
 import beast.base.inference.Operator;
 import beast.base.inference.parameter.RealParameter;
 import beast.base.spec.inference.parameter.IntScalarParam;
+import beast.base.spec.inference.parameter.RealScalarParam;
 import beast.base.spec.inference.parameter.RealVectorParam;
 import mixture.beast.evolution.mixture.RelaxedRatesPriorSVS;
 import mixture.beast.evolution.operator.ACSigma2NonCenteredOperator;
@@ -105,7 +106,9 @@ public class SVSRawBranchRatesToBEASTOperatorTest {
                 indicatorIsRandom,
                 fixture.prior,
                 fixture.ucldStdev,
+                true,
                 fixture.sigma2,
+                true,
                 fixture.rootLogRate
         );
     }
@@ -115,9 +118,9 @@ public class SVSRawBranchRatesToBEASTOperatorTest {
         final RealVectorParam<?> rates = TypedParameterUtils.positiveRealVector(
                 "rawRates.fixture", new double[]{1.0, 1.0, 1.0, 1.0}, true);
         final IntScalarParam<?> indicator = TypedParameterUtils.intScalar("indicator.fixture", indicatorValue, true);
-        final RealParameter ucldStdev = realParameter("ucldStdev", 0.4);
-        final RealParameter sigma2 = realParameter("sigma2", 0.2);
-        final RealParameter rootLogRate = realParameter("rootLogRate", 0.0);
+        final RealScalarParam<?> ucldStdev = TypedParameterUtils.positiveRealScalar("ucldStdev", 0.4, true);
+        final RealScalarParam<?> sigma2 = TypedParameterUtils.positiveRealScalar("sigma2", 0.2, true);
+        final RealScalarParam<?> rootLogRate = TypedParameterUtils.realScalar("rootLogRate", 0.0, true);
         final RelaxedRatesPriorSVS prior = prior(tree, rates, indicator, ucldStdev, sigma2, rootLogRate);
         return new Fixture(tree, rates, indicator, ucldStdev, sigma2, rootLogRate, prior);
     }
@@ -126,27 +129,20 @@ public class SVSRawBranchRatesToBEASTOperatorTest {
         return new TreeParser("((A:2.0,B:2.0):3.0,C:5.0);", false, true, true, 1);
     }
 
-    private static RealParameter realParameter(final String id, final double value) {
-        final RealParameter parameter = new RealParameter(Double.toString(value));
-        parameter.setID(id);
-        parameter.initAndValidate();
-        return parameter;
-    }
-
     private static RelaxedRatesPriorSVS prior(final TreeParser tree,
                                               final RealVectorParam<?> rates,
                                               final IntScalarParam<?> indicator,
-                                              final RealParameter ucldStdev,
-                                              final RealParameter sigma2,
-                                              final RealParameter rootLogRate) {
+                                              final RealScalarParam<?> ucldStdev,
+                                              final RealScalarParam<?> sigma2,
+                                              final RealScalarParam<?> rootLogRate) {
         final RelaxedRatesPriorSVS prior = new RelaxedRatesPriorSVS();
         prior.setID("SVSRelaxedClockPrior.fixture");
         prior.setInputValue("tree", tree);
         prior.setInputValue("ratesVector", rates);
         prior.setInputValue("indicatorScalar", indicator);
-        prior.setInputValue("ucldStdev", ucldStdev);
-        prior.setInputValue("sigma2", sigma2);
-        prior.setInputValue("rootLogRate", rootLogRate);
+        prior.setInputValue("ucldStdevScalar", ucldStdev);
+        prior.setInputValue("sigma2Scalar", sigma2);
+        prior.setInputValue("rootLogRateScalar", rootLogRate);
         prior.initAndValidate();
         return prior;
     }
@@ -177,9 +173,9 @@ public class SVSRawBranchRatesToBEASTOperatorTest {
     private record Fixture(TreeParser tree,
                            RealVectorParam<?> rates,
                            IntScalarParam<?> indicator,
-                           RealParameter ucldStdev,
-                           RealParameter sigma2,
-                           RealParameter rootLogRate,
+                           RealScalarParam<?> ucldStdev,
+                           RealScalarParam<?> sigma2,
+                           RealScalarParam<?> rootLogRate,
                            RelaxedRatesPriorSVS prior) {
     }
 }
