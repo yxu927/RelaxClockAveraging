@@ -1,24 +1,34 @@
 package mixture.lphybeast.tobeast.generators;
 
 import beast.base.core.BEASTInterface;
+import beast.base.evolution.tree.Tree;
+import beast.base.evolution.tree.Node;
 import beast.base.evolution.tree.TreeInterface;
-import beast.base.inference.StateNode;
-import beast.base.inference.parameter.IntegerParameter;
+import beast.base.inference.Operator;
 import beast.base.inference.parameter.RealParameter;
+import beast.base.spec.inference.parameter.IntScalarParam;
+import beast.base.spec.inference.parameter.RealVectorParam;
 import lphy.base.evolution.tree.TimeTree;
 import lphy.core.model.RandomVariable;
 import lphy.core.model.Value;
 import lphybeast.BEASTContext;
 import lphybeast.GeneratorToBEAST;
 import mixture.beast.evolution.mixture.RelaxedRatesPriorSVS;
+import mixture.beast.evolution.util.BranchRateIndexHelper;
 
 import mixture.lphy.evolution.auto.SVSRawBranchRates;
 
+import mixture.beast.evolution.operator.ACSubtreeUIncrementOperator;
+import mixture.beast.evolution.operator.ACSigma2NonCenteredOperator;
 import mixture.beast.evolution.operator.IndicatorGibbsOperator;
 import mixture.beast.evolution.operator.SingleRateScaleOperator;
 import mixture.beast.evolution.operator.SubtreeRateScaleOperator;
+import mixture.beast.evolution.operator.UCACSwitchBridgeOperator;
+import mixture.beast.evolution.operator.UCLDStdevNonCenteredOperator;
+import mixture.lphybeast.tobeast.TypedParameterUtils;
 
-import java.util.StringJoiner;
+import java.util.ArrayList;
+import java.util.List;
 
 public class SVSRawBranchRatesToBEAST implements GeneratorToBEAST<SVSRawBranchRates, RelaxedRatesPriorSVS> {
 
@@ -43,56 +53,31 @@ public class SVSRawBranchRatesToBEAST implements GeneratorToBEAST<SVSRawBranchRa
         boolean indicatorIsRandom = indVal instanceof RandomVariable;
 
         TreeInterface beastTree = (TreeInterface) context.getBEASTObject(treeVal);
+        Tree beastTreeImpl = (Tree) beastTree;
         Value<?> outVal = context.getOutput(dist);
 
-        // ---- rates parameter ----
-        RealParameter ratesParam;
-        if (beastValue instanceof RealParameter rp) {
-            ratesParam = rp;
-        } else {
-            ratesParam = new RealParameter();
-            ratesParam.setID("rawRates." + dist.getUniqueId());
-        }
-
-        int nNodes = ((beast.base.evolution.tree.Tree) beastTree).getNodeCount();
+        int nNodes = beastTreeImpl.getNodeCount();
         int targetDim = nNodes - 1;
 
-        if (ratesParam.getDimension() != targetDim) {
-            RealParameter newRates = new RealParameter();
-            newRates.setID("rawRates." + dist.getUniqueId());
-
-            StringJoiner sj = new StringJoiner(" ");
-            for (int i = 0; i < targetDim; i++) sj.add("1.0");
-
-            newRates.setInputValue("value", sj.toString());
-            newRates.setInputValue("lower", "0.0");
-            newRates.setInputValue("estimate", true);
-            newRates.initAndValidate();
-
-            if (beastValue != null) {
-                context.removeBEASTObject(beastValue);
-            }
-            context.putBEASTObject(outVal, newRates);
-            ratesParam = newRates;
-        } else {
-            ratesParam.setLower(0.0);
-        }
+        // ---- rates parameter ----
+        RealVectorParam<?> ratesParam = positiveRatesFromLPhyValue(
+                "rawRates." + dist.getUniqueId(),
+                beastValue,
+                beastTreeImpl,
+                targetDim,
+                true
+        );
+        TypedParameterUtils.replaceInContext(context, outVal, beastValue, ratesParam);
 
         // ---- indicator parameter ----
-        IntegerParameter indParam;
         BEASTInterface indObj = context.getBEASTObject(indVal);
-        if (indObj instanceof IntegerParameter ip) {
-            indParam = ip;
-        } else {
-            indParam = new IntegerParameter();
-            indParam.setID("indicator." + dist.getUniqueId());
-            indParam.setInputValue("value", indVal.value() != null ? String.valueOf(indVal.value()) : "0");
-            indParam.setInputValue("lower", 0);
-            indParam.setInputValue("upper", 1);
-            indParam.setInputValue("estimate", indicatorIsRandom);
-            indParam.initAndValidate();
-            context.putBEASTObject(indVal, indParam);
-        }
+        IntScalarParam<?> indParam = TypedParameterUtils.intScalarFrom(
+                indObj,
+                "indicator." + dist.getUniqueId(),
+                indVal.value() != null ? indVal.value() : 0,
+                indicatorIsRandom
+        );
+        TypedParameterUtils.replaceInContext(context, indVal, indObj, indParam);
 
         // ---- hyperparameters ----
         RealParameter ucldStdev = context.getAsRealParameter(ucldVal);
@@ -104,8 +89,8 @@ public class SVSRawBranchRatesToBEAST implements GeneratorToBEAST<SVSRawBranchRa
         prior.setID("SVSRelaxedClockPrior." + dist.getUniqueId());
 
         prior.setInputValue("tree", beastTree);
-        prior.setInputValue("rates", ratesParam);
-        prior.setInputValue("indicator", indParam);
+        prior.setInputValue("ratesVector", ratesParam);
+        prior.setInputValue("indicatorScalar", indParam);
         prior.setInputValue("ucldStdev", ucldStdev);
         prior.setInputValue("sigma2", sigma2);
         prior.setInputValue("rootLogRate", rootLogRate);
@@ -113,47 +98,227 @@ public class SVSRawBranchRatesToBEAST implements GeneratorToBEAST<SVSRawBranchRa
         prior.initAndValidate();
         context.addBEASTObject(prior, dist);
 
-        // ---- Operators ----
+        for (final Operator operator : createOperatorSchedule(dist.getUniqueId(), beastTree, ratesParam, indParam,
+                indicatorIsRandom, prior, ucldStdev, sigma2, rootLogRate)) {
+            context.addExtraOperator(operator);
+        }
 
-        // 1) Single-dimension multiplicative scale on positive rates
+        context.addSkipOperator(ratesParam);
+        if (indicatorIsRandom) {
+            context.addSkipOperator(indParam);
+        }
+        context.addSkipLoggable(ratesParam);
+
+        return prior;
+    }
+
+    private static double[] ones(final int dimension) {
+        final double[] values = new double[dimension];
+        for (int i = 0; i < dimension; i++) {
+            values[i] = 1.0;
+        }
+        return values;
+    }
+
+    static RealVectorParam<?> positiveRatesFromLPhyValue(final String fallbackId,
+                                                         final BEASTInterface beastValue,
+                                                         final Tree beastTree,
+                                                         final int targetDimension,
+                                                         final boolean estimate) {
+        final double[] values = nonRootRateValues(beastValue, beastTree, targetDimension);
+        return TypedParameterUtils.positiveRealVector(idOrFallback(beastValue, fallbackId), values, estimate);
+    }
+
+    private static double[] nonRootRateValues(final BEASTInterface beastValue,
+                                              final Tree beastTree,
+                                              final int targetDimension) {
+        if (beastValue instanceof RealVectorParam<?> typed) {
+            return nonRootRateValues(typed, beastTree, targetDimension);
+        }
+        if (beastValue instanceof RealParameter legacy) {
+            return nonRootRateValues(legacy, beastTree, targetDimension);
+        }
+        return ones(targetDimension);
+    }
+
+    private static double[] nonRootRateValues(final RealVectorParam<?> typed,
+                                              final Tree beastTree,
+                                              final int targetDimension) {
+        final int observed = typed.size();
+        if (observed == 1) {
+            return fill(targetDimension, typed.get(0));
+        }
+        if (observed == targetDimension) {
+            final double[] values = new double[targetDimension];
+            for (int i = 0; i < targetDimension; i++) {
+                values[i] = typed.get(i);
+            }
+            return values;
+        }
+        if (observed == beastTree.getNodeCount()) {
+            return stripRootSlot(beastTree, observed, typed::get);
+        }
+        return ones(targetDimension);
+    }
+
+    private static double[] nonRootRateValues(final RealParameter legacy,
+                                              final Tree beastTree,
+                                              final int targetDimension) {
+        final int observed = legacy.getDimension();
+        if (observed == 1) {
+            return fill(targetDimension, legacy.getValue(0));
+        }
+        if (observed == targetDimension) {
+            final double[] values = new double[targetDimension];
+            for (int i = 0; i < targetDimension; i++) {
+                values[i] = legacy.getValue(i);
+            }
+            return values;
+        }
+        if (observed == beastTree.getNodeCount()) {
+            return stripRootSlot(beastTree, observed, legacy::getValue);
+        }
+        return ones(targetDimension);
+    }
+
+    private static double[] stripRootSlot(final Tree beastTree,
+                                          final int observed,
+                                          final IndexedDouble values) {
+        final BranchRateIndexHelper.Mapping mapping = BranchRateIndexHelper.buildDeterministic(beastTree);
+        final double[] nonRoot = new double[beastTree.getNodeCount() - 1];
+        for (int i = 0; i < beastTree.getNodeCount(); i++) {
+            final Node node = beastTree.getNode(i);
+            final int nr = node.getNr();
+            if (nr >= observed) {
+                return ones(nonRoot.length);
+            }
+            final int rateIndex = mapping.idxForNodeNr(nr);
+            if (rateIndex >= 0) {
+                nonRoot[rateIndex] = values.get(nr);
+            }
+        }
+        return nonRoot;
+    }
+
+    private static double[] fill(final int dimension, final double value) {
+        final double[] values = new double[dimension];
+        for (int i = 0; i < dimension; i++) {
+            values[i] = value;
+        }
+        return values;
+    }
+
+    private static String idOrFallback(final BEASTInterface beastValue, final String fallbackId) {
+        return beastValue != null && beastValue.getID() != null ? beastValue.getID() : fallbackId;
+    }
+
+    @FunctionalInterface
+    private interface IndexedDouble {
+        double get(int index);
+    }
+
+    static List<Operator> createOperatorSchedule(final String uid,
+                                                 final TreeInterface beastTree,
+                                                 final RealVectorParam<?> ratesParam,
+                                                 final IntScalarParam<?> indParam,
+                                                 final boolean indicatorIsRandom,
+                                                 final RelaxedRatesPriorSVS prior,
+                                                 final RealParameter ucldStdev,
+                                                 final RealParameter sigma2,
+                                                 final RealParameter rootLogRate) {
+        final List<Operator> operators = new ArrayList<>();
+        final int indicator = indParam.get();
+
         SingleRateScaleOperator oneScale = new SingleRateScaleOperator();
-        oneScale.setID("rawRates.oneScale." + dist.getUniqueId());
-        oneScale.setInputValue("rates", ratesParam);
+        oneScale.setID("rawRates.oneScale." + uid);
+        oneScale.setInputValue("ratesVector", ratesParam);
         oneScale.setInputValue("window", 0.3);
         oneScale.setInputValue("weight", 15.0);
         oneScale.initAndValidate();
-        context.addExtraOperator(oneScale);
+        operators.add(oneScale);
 
-        // 2) Subtree correlated scale move
         SubtreeRateScaleOperator subScale = new SubtreeRateScaleOperator();
-        subScale.setID("rawRates.subtreeScale." + dist.getUniqueId());
+        subScale.setID("rawRates.subtreeScale." + uid);
         subScale.setInputValue("tree", beastTree);
-        subScale.setInputValue("rates", ratesParam);
+        subScale.setInputValue("ratesVector", ratesParam);
         subScale.setInputValue("window", 0.25);
         subScale.setInputValue("weight", 10.0);
         subScale.initAndValidate();
-        context.addExtraOperator(subScale);
+        operators.add(subScale);
 
-        // 3) Indicator operators only when indicator is a random variable
         if (indicatorIsRandom) {
             IndicatorGibbsOperator gibbs = new IndicatorGibbsOperator();
-            gibbs.setID("indicator.gibbs." + dist.getUniqueId());
-            gibbs.setInputValue("indicator", indParam);
+            gibbs.setID("indicator.gibbs." + uid);
+            gibbs.setInputValue("indicatorScalar", indParam);
             gibbs.setInputValue("prior", prior);
             gibbs.setInputValue("pOne", 0.5);
             gibbs.setInputValue("weight", 2.0);
             gibbs.initAndValidate();
-            context.addExtraOperator(gibbs);
-
-
-
-            if (indParam instanceof StateNode) context.addSkipOperator((StateNode) indParam);
+            operators.add(gibbs);
         }
 
-        if (ratesParam instanceof StateNode) context.addSkipOperator((StateNode) ratesParam);
-        context.addSkipLoggable(ratesParam);
+        if (indicatorIsRandom || indicator == 1) {
+            ACSubtreeUIncrementOperator acSubtree = new ACSubtreeUIncrementOperator();
+            acSubtree.setID("acSubtreeU." + uid);
+            acSubtree.setInputValue("tree", beastTree);
+            acSubtree.setInputValue("ratesVector", ratesParam);
+            acSubtree.setInputValue("indicatorScalar", indParam);
+            acSubtree.setInputValue("sigma2", sigma2);
+            acSubtree.setInputValue("rootLogRate", rootLogRate);
+            acSubtree.setInputValue("minBranchLength", 1e-12);
+            acSubtree.setInputValue("delta", 0.25);
+            acSubtree.setInputValue("internalOnly", true);
+            acSubtree.setInputValue("allowRoot", false);
+            acSubtree.setInputValue("maxSubtreeEdges", 80);
+            acSubtree.setInputValue("rejectIfNotAC", true);
+            acSubtree.setInputValue("weight", 15.0);
+            acSubtree.initAndValidate();
+            operators.add(acSubtree);
 
-        return prior;
+            ACSigma2NonCenteredOperator sigma2NC = new ACSigma2NonCenteredOperator();
+            sigma2NC.setID("acSigma2NC." + uid);
+            sigma2NC.setInputValue("tree", beastTree);
+            sigma2NC.setInputValue("ratesVector", ratesParam);
+            sigma2NC.setInputValue("indicatorScalar", indParam);
+            sigma2NC.setInputValue("sigma2", sigma2);
+            sigma2NC.setInputValue("rootLogRate", rootLogRate);
+            sigma2NC.setInputValue("minBranchLength", 1e-12);
+            sigma2NC.setInputValue("window", 0.15);
+            sigma2NC.setInputValue("rejectIfNotAC", true);
+            sigma2NC.setInputValue("weight", 15.0);
+            sigma2NC.initAndValidate();
+            operators.add(sigma2NC);
+        }
+
+        if (indicatorIsRandom || indicator == 0) {
+            UCLDStdevNonCenteredOperator ucldNC = new UCLDStdevNonCenteredOperator();
+            ucldNC.setID("ucldSigmaNC." + uid);
+            ucldNC.setInputValue("ratesVector", ratesParam);
+            ucldNC.setInputValue("indicatorScalar", indParam);
+            ucldNC.setInputValue("ucldStdev", ucldStdev);
+            ucldNC.setInputValue("window", 0.20);
+            ucldNC.setInputValue("rejectIfNotUC", true);
+            ucldNC.setInputValue("weight", 15.0);
+            ucldNC.initAndValidate();
+            operators.add(ucldNC);
+        }
+
+        if (indicatorIsRandom) {
+            UCACSwitchBridgeOperator bridge = new UCACSwitchBridgeOperator();
+            bridge.setID("ucacBridge." + uid);
+            bridge.setInputValue("tree", beastTree);
+            bridge.setInputValue("ratesVector", ratesParam);
+            bridge.setInputValue("indicatorScalar", indParam);
+            bridge.setInputValue("ucldStdev", ucldStdev);
+            bridge.setInputValue("sigma2", sigma2);
+            bridge.setInputValue("rootLogRate", rootLogRate);
+            bridge.setInputValue("minBranchLength", 1e-12);
+            bridge.setInputValue("weight", 10.0);
+            bridge.initAndValidate();
+            operators.add(bridge);
+        }
+
+        return operators;
     }
 
     @Override public Class<SVSRawBranchRates> getGeneratorClass() { return SVSRawBranchRates.class; }

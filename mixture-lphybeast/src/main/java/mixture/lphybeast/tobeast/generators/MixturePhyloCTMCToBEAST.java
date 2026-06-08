@@ -19,6 +19,7 @@ import mixture.beast.evolution.mixture.MixtureLikelihoodLogger;
 import mixture.beast.evolution.mixture.MixtureTreeLikelihood;
 import mixture.beast.evolution.mixture.RelaxedRatesPriorSVS;
 import mixture.lphy.evolution.auto.SVSRawBranchRates;
+import mixture.lphybeast.tobeast.TypedParameterUtils;
 
 
 import java.util.*;
@@ -115,8 +116,20 @@ public class MixturePhyloCTMCToBEAST implements GeneratorToBEAST<MixturePhyloCTM
                     (w == null ? 0 : w.length) + ") must equal number of components (" + K + ").");
         }
 
-        RealParameter wParam = context.getAsRealParameter(wVal);
-        beastMix.setInputValue("weights", wParam);
+        BEASTInterface weightsObject = context.getBEASTObject(wVal);
+        if (!TypedParameterUtils.isRandom(wVal)) {
+            BEASTInterface typedWeights = TypedParameterUtils.realVectorFrom(
+                    weightsObject,
+                    wVal.getId(),
+                    TypedParameterUtils.values(w),
+                    false
+            );
+            TypedParameterUtils.replaceInContext(context, wVal, weightsObject, typedWeights);
+            beastMix.setInputValue("weightsVector", typedWeights);
+        } else {
+            RealParameter wParam = context.getAsRealParameter(wVal);
+            beastMix.setInputValue("weights", wParam);
+        }
 
         beastMix.initAndValidate();
         beastMix.setID(beastAlignment.getID() + ".mixtureTreeLikelihood");
