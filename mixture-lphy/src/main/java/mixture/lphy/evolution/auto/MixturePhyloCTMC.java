@@ -141,7 +141,7 @@ public final class MixturePhyloCTMC implements GenerativeDistribution<Alignment>
             name = "MixturePhyloCTMC",
             verbClause = "is assumed to have evolved under a mixture of",
             narrativeName = "phylogenetic CTMC mixture",
-            examples = {"mixtureLikelihood.lphy"},
+            examples = {"test.lphy"},
             category = GeneratorCategory.PHYLO_LIKELIHOOD,
             description = "Mixture of two or three component phylogenetic likelihoods that apply to the same alignment."
     )

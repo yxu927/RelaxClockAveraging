@@ -99,23 +99,23 @@ The LPhy-side modules test and package successfully:
 
 The LPhyBEAST mapping has been moved to the LPhyBEAST 2.0 mapping API. The
 custom mixture mappings can generate a BEAST3-valid XML from
-`mixture-lphy/examples/new.lphy`.
+`mixture-lphy/examples/test.lphy`.
 
 Generate XML:
 
 ```bash
 mvn -q -pl mixture-lphybeast-launcher exec:exec \
-  -Dlphybeast.args="convert --packagedir ../target/lphybeast-packages -o ../target/lphybeast-new.xml -l 2000 -le 100 ../mixture-lphy/examples/new.lphy"
+  -Dlphybeast.args="convert --packagedir ../target/lphybeast-packages -o ../target/lphybeast-test.xml -l 2000 -le 100 ../mixture-lphy/examples/test.lphy"
 ```
 
-The generated XML is written to `mixture-lphy/target/lphybeast-new.xml`.
+The generated XML is written to `mixture-lphy/target/lphybeast-test.xml`.
 
 Validate and smoke-run:
 
 ```bash
-xmllint --noout mixture-lphy/target/lphybeast-new.xml
-scripts/beast3_validate_xml.sh mixture-lphy/target/lphybeast-new.xml
-scripts/beast3_run.sh -overwrite mixture-lphy/target/lphybeast-new.xml
+xmllint --noout mixture-lphy/target/lphybeast-test.xml
+scripts/beast3_validate_xml.sh mixture-lphy/target/lphybeast-test.xml
+scripts/beast3_run.sh -overwrite mixture-lphy/target/lphybeast-test.xml
 ```
 
 The generated XML uses the BEAST3 typed/spec path for custom mixture classes,

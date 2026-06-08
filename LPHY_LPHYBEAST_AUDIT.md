@@ -21,7 +21,7 @@ Base check: `origin/main...main = 0 0`, worktree clean before changes.
   indicator is random. For fixed indicators, the mapper adds only the
   compatible within-model non-centered operators, preserving the fixed-model
   semantics.
-- Real `mixture-lphy/examples/new.lphy -> XML -> BEAST3 validate -> smoke run`
+- Real `mixture-lphy/examples/test.lphy -> XML -> BEAST3 validate -> smoke run`
   now passes on the LPhyBEAST 2.0 spike path.
 - The LPhy `MixturePhyloCTMC` `index` parameter is simulation-only. The BEAST
   mapper now removes that top-level allocation value/prior from the generated
@@ -61,7 +61,7 @@ Current custom generator mappings:
 | `Categorical` | `CategoricalDistribution` | Uses `parameterScalar`; uses `pVector` when `p` is deterministic/constant, otherwise keeps legacy `p`. |
 | `MixturePhyloCTMC` | `MixtureTreeLikelihood` | Uses `weightsVector`; builds spec `ThreadedTreeLikelihood` component likelihoods; supplies inherited `data`, `tree`, and `siteModel` inputs required by `MixtureTreeLikelihood`'s `GenericTreeLikelihood` base class; adds mixture and hierarchical SVS loggers. |
 
-This is now a typed custom-structure path that can generate a BEAST3-valid XML from `new.lphy`.
+This is now a typed custom-structure path that can generate a BEAST3-valid XML from `test.lphy`.
 
 ### Operator coverage
 
@@ -100,8 +100,8 @@ Current non-fatal generated-XML warnings:
 
 ## Example Coverage
 
-- `mixture-lphy/examples/new.lphy` and `simulation.lphy` use the current SVS/shared-rates LPhy API.
-- `strictvsrelax.lphy` and `mixtureLikelihood.lphy` still use older `UCLN_Mean1` / `AutoCorrelated...` generators and do not exercise the SVS mapper path.
+- `mixture-lphy/examples/test.lphy` and `simulation.lphy` use the current SVS/shared-rates LPhy API.
+- Older examples that used `UCLN_Mean1` / `AutoCorrelated...` generators have been removed from the maintained example set.
 
 ## Verification
 
@@ -114,14 +114,14 @@ Passed:
 - `scripts/beast3_validate_xml.sh mixture-beast/examples/mixture-typed.xml`
 - `SMOKE_CHAIN_LENGTH=2000 scripts/validate_beast3_examples.sh`
 - `mvn -q -pl mixture-lphybeast -am -DskipTests install`
-- `mvn -q -pl mixture-lphybeast-launcher exec:exec -Dlphybeast.args="convert --packagedir ../target/lphybeast-packages -o ../target/lphybeast-new.xml -l 2000 -le 100 ../mixture-lphy/examples/new.lphy"`
-- `xmllint --noout mixture-lphy/target/lphybeast-new.xml`
-- `scripts/beast3_validate_xml.sh mixture-lphy/target/lphybeast-new.xml`
-- `scripts/beast3_run.sh -overwrite mixture-lphy/target/lphybeast-new.xml`
+- `mvn -q -pl mixture-lphybeast-launcher exec:exec -Dlphybeast.args="convert --packagedir ../target/lphybeast-packages -o ../target/lphybeast-test.xml -l 2000 -le 100 ../mixture-lphy/examples/test.lphy"`
+- `xmllint --noout mixture-lphy/target/lphybeast-test.xml`
+- `scripts/beast3_validate_xml.sh mixture-lphy/target/lphybeast-test.xml`
+- `scripts/beast3_run.sh -overwrite mixture-lphy/target/lphybeast-test.xml`
 
 The generated XML output path is resolved by LPhyBEAST relative to the `.lphy`
 script directory after it sets the working directory, so `-o
-../target/lphybeast-new.xml` writes to `mixture-lphy/target/lphybeast-new.xml`.
+../target/lphybeast-test.xml` writes to `mixture-lphy/target/lphybeast-test.xml`.
 
 The BEAST runs fall back to `BeerLikelihoodCore4` because local BEAGLE JNI is unavailable; this is unchanged from the direct XML path and did not prevent validation or smoke runs.
 

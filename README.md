@@ -116,28 +116,28 @@ scripts/beast3_validate_xml.sh /path/to/saved.xml
 The LPhyBEAST path generates BEAST3-valid XML from:
 
 ```text
-mixture-lphy/examples/new.lphy
+mixture-lphy/examples/test.lphy
 ```
 
 Generate XML from LPhy:
 
 ```bash
 mvn -q -pl mixture-lphybeast-launcher exec:exec \
-  -Dlphybeast.args="convert --packagedir ../target/lphybeast-packages -o ../target/lphybeast-new.xml -l 2000 -le 100 ../mixture-lphy/examples/new.lphy"
+  -Dlphybeast.args="convert --packagedir ../target/lphybeast-packages -o ../target/lphybeast-test.xml -l 2000 -le 100 ../mixture-lphy/examples/test.lphy"
 ```
 
 The generated XML is written to:
 
 ```text
-mixture-lphy/target/lphybeast-new.xml
+mixture-lphy/target/lphybeast-test.xml
 ```
 
 Validate and run the generated XML:
 
 ```bash
-xmllint --noout mixture-lphy/target/lphybeast-new.xml
-scripts/beast3_validate_xml.sh mixture-lphy/target/lphybeast-new.xml
-scripts/beast3_run.sh -overwrite mixture-lphy/target/lphybeast-new.xml
+xmllint --noout mixture-lphy/target/lphybeast-test.xml
+scripts/beast3_validate_xml.sh mixture-lphy/target/lphybeast-test.xml
+scripts/beast3_run.sh -overwrite mixture-lphy/target/lphybeast-test.xml
 ```
 
 The generated XML uses the BEAST3 typed/spec path for the custom mixture components, includes the same SVS relaxed-clock operators, and keeps simulation-only allocation variables out of the MCMC state.
