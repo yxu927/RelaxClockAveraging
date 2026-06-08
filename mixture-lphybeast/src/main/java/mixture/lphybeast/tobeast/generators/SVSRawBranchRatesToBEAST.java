@@ -7,6 +7,7 @@ import beast.base.evolution.tree.TreeInterface;
 import beast.base.inference.Operator;
 import beast.base.inference.parameter.RealParameter;
 import beast.base.spec.inference.parameter.IntScalarParam;
+import beast.base.spec.inference.parameter.RealScalarParam;
 import beast.base.spec.inference.parameter.RealVectorParam;
 import lphy.base.evolution.tree.TimeTree;
 import lphy.core.model.RandomVariable;
@@ -51,6 +52,9 @@ public class SVSRawBranchRatesToBEAST implements GeneratorToBEAST<SVSRawBranchRa
         Value<Double> rootVal = (Value<Double>) dist.getParams().get(SVSRawBranchRates.ROOT_LOG_RATE);
 
         boolean indicatorIsRandom = indVal instanceof RandomVariable;
+        boolean ucldStdevIsRandom = TypedParameterUtils.isRandom(ucldVal);
+        boolean sigma2IsRandom = TypedParameterUtils.isRandom(sigma2Val);
+        boolean rootLogRateIsRandom = TypedParameterUtils.isRandom(rootVal);
 
         TreeInterface beastTree = (TreeInterface) context.getBEASTObject(treeVal);
         Tree beastTreeImpl = (Tree) beastTree;
@@ -80,9 +84,12 @@ public class SVSRawBranchRatesToBEAST implements GeneratorToBEAST<SVSRawBranchRa
         TypedParameterUtils.replaceInContext(context, indVal, indObj, indParam);
 
         // ---- hyperparameters ----
-        RealParameter ucldStdev = context.getAsRealParameter(ucldVal);
-        RealParameter sigma2 = context.getAsRealParameter(sigma2Val);
-        RealParameter rootLogRate = context.getAsRealParameter(rootVal);
+        RealScalarParam<?> ucldStdev = realScalarParam(context, ucldVal, "ucldStdev");
+        RealScalarParam<?> sigma2 = realScalarParam(context, sigma2Val, "sigma2");
+        RealScalarParam<?> rootLogRate = realScalarParam(context, rootVal, "rootLogRate");
+        prepareOperatorScalar(context, ucldStdev, ucldStdevIsRandom);
+        prepareOperatorScalar(context, sigma2, sigma2IsRandom);
+        prepareOperatorScalar(context, rootLogRate, rootLogRateIsRandom);
 
         // ---- SVS prior ----
         RelaxedRatesPriorSVS prior = new RelaxedRatesPriorSVS();
@@ -91,15 +98,15 @@ public class SVSRawBranchRatesToBEAST implements GeneratorToBEAST<SVSRawBranchRa
         prior.setInputValue("tree", beastTree);
         prior.setInputValue("ratesVector", ratesParam);
         prior.setInputValue("indicatorScalar", indParam);
-        prior.setInputValue("ucldStdev", ucldStdev);
-        prior.setInputValue("sigma2", sigma2);
-        prior.setInputValue("rootLogRate", rootLogRate);
+        prior.setInputValue("ucldStdevScalar", ucldStdev);
+        prior.setInputValue("sigma2Scalar", sigma2);
+        prior.setInputValue("rootLogRateScalar", rootLogRate);
 
         prior.initAndValidate();
         context.addBEASTObject(prior, dist);
 
         for (final Operator operator : createOperatorSchedule(dist.getUniqueId(), beastTree, ratesParam, indParam,
-                indicatorIsRandom, prior, ucldStdev, sigma2, rootLogRate)) {
+                indicatorIsRandom, prior, ucldStdev, ucldStdevIsRandom, sigma2, sigma2IsRandom, rootLogRate)) {
             context.addExtraOperator(operator);
         }
 
@@ -212,6 +219,32 @@ public class SVSRawBranchRatesToBEAST implements GeneratorToBEAST<SVSRawBranchRa
         return beastValue != null && beastValue.getID() != null ? beastValue.getID() : fallbackId;
     }
 
+    private static RealScalarParam<?> realScalarParam(final BEASTContext context,
+                                                      final Value<Double> value,
+                                                      final String name) {
+        final Object scalar = context.getAsRealScalar(value);
+        if (scalar instanceof RealScalarParam<?> parameter) {
+            return parameter;
+        }
+        throw new IllegalArgumentException("SVSRawBranchRatesToBEAST: " + name
+                + " must map to RealScalarParam for operator scheduling, got "
+                + scalar.getClass().getName());
+    }
+
+    private static void prepareOperatorScalar(final BEASTContext context,
+                                              final RealScalarParam<?> scalar,
+                                              final boolean estimate) {
+        scalar.isEstimatedInput.setValue(estimate, scalar);
+        if (estimate && !context.getState().contains(scalar)) {
+            context.getState().add(scalar);
+        }
+        if (!estimate) {
+            context.getState().remove(scalar);
+            context.addSkipOperator(scalar);
+            context.addSkipLoggable(scalar);
+        }
+    }
+
     @FunctionalInterface
     private interface IndexedDouble {
         double get(int index);
@@ -223,9 +256,11 @@ public class SVSRawBranchRatesToBEAST implements GeneratorToBEAST<SVSRawBranchRa
                                                  final IntScalarParam<?> indParam,
                                                  final boolean indicatorIsRandom,
                                                  final RelaxedRatesPriorSVS prior,
-                                                 final RealParameter ucldStdev,
-                                                 final RealParameter sigma2,
-                                                 final RealParameter rootLogRate) {
+                                                 final RealScalarParam<?> ucldStdev,
+                                                 final boolean ucldStdevIsRandom,
+                                                 final RealScalarParam<?> sigma2,
+                                                 final boolean sigma2IsRandom,
+                                                 final RealScalarParam<?> rootLogRate) {
         final List<Operator> operators = new ArrayList<>();
         final int indicator = indParam.get();
 
@@ -263,8 +298,8 @@ public class SVSRawBranchRatesToBEAST implements GeneratorToBEAST<SVSRawBranchRa
             acSubtree.setInputValue("tree", beastTree);
             acSubtree.setInputValue("ratesVector", ratesParam);
             acSubtree.setInputValue("indicatorScalar", indParam);
-            acSubtree.setInputValue("sigma2", sigma2);
-            acSubtree.setInputValue("rootLogRate", rootLogRate);
+            acSubtree.setInputValue("sigma2Scalar", sigma2);
+            acSubtree.setInputValue("rootLogRateScalar", rootLogRate);
             acSubtree.setInputValue("minBranchLength", 1e-12);
             acSubtree.setInputValue("delta", 0.25);
             acSubtree.setInputValue("internalOnly", true);
@@ -275,27 +310,29 @@ public class SVSRawBranchRatesToBEAST implements GeneratorToBEAST<SVSRawBranchRa
             acSubtree.initAndValidate();
             operators.add(acSubtree);
 
-            ACSigma2NonCenteredOperator sigma2NC = new ACSigma2NonCenteredOperator();
-            sigma2NC.setID("acSigma2NC." + uid);
-            sigma2NC.setInputValue("tree", beastTree);
-            sigma2NC.setInputValue("ratesVector", ratesParam);
-            sigma2NC.setInputValue("indicatorScalar", indParam);
-            sigma2NC.setInputValue("sigma2", sigma2);
-            sigma2NC.setInputValue("rootLogRate", rootLogRate);
-            sigma2NC.setInputValue("minBranchLength", 1e-12);
-            sigma2NC.setInputValue("window", 0.15);
-            sigma2NC.setInputValue("rejectIfNotAC", true);
-            sigma2NC.setInputValue("weight", 15.0);
-            sigma2NC.initAndValidate();
-            operators.add(sigma2NC);
+            if (sigma2IsRandom) {
+                ACSigma2NonCenteredOperator sigma2NC = new ACSigma2NonCenteredOperator();
+                sigma2NC.setID("acSigma2NC." + uid);
+                sigma2NC.setInputValue("tree", beastTree);
+                sigma2NC.setInputValue("ratesVector", ratesParam);
+                sigma2NC.setInputValue("indicatorScalar", indParam);
+                sigma2NC.setInputValue("sigma2Scalar", sigma2);
+                sigma2NC.setInputValue("rootLogRateScalar", rootLogRate);
+                sigma2NC.setInputValue("minBranchLength", 1e-12);
+                sigma2NC.setInputValue("window", 0.15);
+                sigma2NC.setInputValue("rejectIfNotAC", true);
+                sigma2NC.setInputValue("weight", 15.0);
+                sigma2NC.initAndValidate();
+                operators.add(sigma2NC);
+            }
         }
 
-        if (indicatorIsRandom || indicator == 0) {
+        if (ucldStdevIsRandom && (indicatorIsRandom || indicator == 0)) {
             UCLDStdevNonCenteredOperator ucldNC = new UCLDStdevNonCenteredOperator();
             ucldNC.setID("ucldSigmaNC." + uid);
             ucldNC.setInputValue("ratesVector", ratesParam);
             ucldNC.setInputValue("indicatorScalar", indParam);
-            ucldNC.setInputValue("ucldStdev", ucldStdev);
+            ucldNC.setInputValue("ucldStdevScalar", ucldStdev);
             ucldNC.setInputValue("window", 0.20);
             ucldNC.setInputValue("rejectIfNotUC", true);
             ucldNC.setInputValue("weight", 15.0);
@@ -309,9 +346,9 @@ public class SVSRawBranchRatesToBEAST implements GeneratorToBEAST<SVSRawBranchRa
             bridge.setInputValue("tree", beastTree);
             bridge.setInputValue("ratesVector", ratesParam);
             bridge.setInputValue("indicatorScalar", indParam);
-            bridge.setInputValue("ucldStdev", ucldStdev);
-            bridge.setInputValue("sigma2", sigma2);
-            bridge.setInputValue("rootLogRate", rootLogRate);
+            bridge.setInputValue("ucldStdevScalar", ucldStdev);
+            bridge.setInputValue("sigma2Scalar", sigma2);
+            bridge.setInputValue("rootLogRateScalar", rootLogRate);
             bridge.setInputValue("minBranchLength", 1e-12);
             bridge.setInputValue("weight", 10.0);
             bridge.initAndValidate();
