@@ -96,20 +96,39 @@ The LPhy-side modules test and package successfully:
 - `mixture-lphy`
 - `mixture-lphybeast`
 - `mixture-lphy-studio`
+- `mixture-lphybeast-launcher`
 
-No safe, documented `.lphy -> XML` generation command was found in this repository. LPhyBEAST typed XML generation is therefore deferred until a stable command/test exists.
+The LPhyBEAST mapping has been moved to the LPhyBEAST 2.0 mapping API. The
+custom mixture mappings can generate a BEAST3-valid XML from
+`mixture-lphy/examples/new.lphy`.
 
-Likely future mapper files:
+Generate XML:
 
-- `SVSRawBranchRatesToBEAST.java`
-- `SharedRatesClockToBEAST.java`
-- `MixturePhyloCTMCToBEAST.java`
-- `CategoricalToBEAST.java`
+```bash
+mvn -q -pl mixture-lphybeast-launcher exec:exec \
+  -Dlphybeast.args="convert --packagedir ../target/lphybeast-packages -o ../target/lphybeast-new.xml -l 2000 -le 100 ../mixture-lphy/examples/new.lphy"
+```
+
+The generated XML is written to `mixture-lphy/target/lphybeast-new.xml`.
+
+Validate and smoke-run:
+
+```bash
+xmllint --noout mixture-lphy/target/lphybeast-new.xml
+scripts/beast3_validate_xml.sh mixture-lphy/target/lphybeast-new.xml
+scripts/beast3_run.sh -overwrite mixture-lphy/target/lphybeast-new.xml
+```
+
+The generated XML uses the BEAST3 typed/spec path for custom mixture classes,
+includes the final SVS relaxed-clock operators, omits `AlphaAnnealingOperator`,
+removes the simulation-only top-level `i_top` allocation from the MCMC state,
+and keeps fixed scalar values such as `rootLogRate = 0.0` out of the
+state/log/operator schedule.
 
 ## Remaining work
 
-- Optionally add a stable `.lphy -> XML` LPhyBEAST command/test.
-- Optionally update LPhyBEAST mappers to generate typed XML.
+- Optionally add a generated-XML regression script or CI job.
+- Optionally polish BEAUti labels and parameter grouping.
 - Optional later work: add an alpha-coupled example if `AlphaAnnealingOperator` is needed for a separate annealed-likelihood workflow.
 
 ## Safety notes
