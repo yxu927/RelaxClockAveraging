@@ -82,6 +82,9 @@ public class SVSRawBranchRatesToBEAST implements GeneratorToBEAST<SVSRawBranchRa
                 indicatorIsRandom
         );
         TypedParameterUtils.replaceInContext(context, indVal, indObj, indParam);
+        if (!indicatorIsRandom) {
+            prepareFixedOperatorIndicator(context, indParam);
+        }
 
         // ---- hyperparameters ----
         RealScalarParam<?> ucldStdev = realScalarParam(context, ucldVal, "ucldStdev");
@@ -243,6 +246,16 @@ public class SVSRawBranchRatesToBEAST implements GeneratorToBEAST<SVSRawBranchRa
             context.addSkipOperator(scalar);
             context.addSkipLoggable(scalar);
         }
+    }
+
+    private static void prepareFixedOperatorIndicator(final BEASTContext context,
+                                                      final IntScalarParam<?> indicator) {
+        indicator.isEstimatedInput.setValue(false, indicator);
+        if (!context.getState().contains(indicator)) {
+            context.getState().add(indicator);
+        }
+        context.addSkipOperator(indicator);
+        context.addSkipLoggable(indicator);
     }
 
     @FunctionalInterface
